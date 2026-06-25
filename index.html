@@ -6,115 +6,752 @@
   <title>liuys HTML Pages</title>
   <style>
     :root {
-      --paper: #f5f7fb;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #d9e0ea;
-      --panel: #ffffff;
-      --accent: #0f766e;
-      --accent-soft: #dff7f3;
-      --code: #eef2f7;
-      --shadow: 0 18px 42px rgba(28, 39, 64, .09);
+      color-scheme: light;
+      --glacier-950: #102033;
+      --glacier-800: #203a55;
+      --glacier-600: #2b6f9f;
+      --glacier-400: #71b9e6;
+      --ice-200: #d9eefb;
+      --ice-100: #eef8ff;
+      --snow: #fbfdff;
+      --glass: rgba(255, 255, 255, .58);
+      --glass-strong: rgba(255, 255, 255, .74);
+      --line: rgba(125, 165, 196, .28);
+      --muted: #607487;
+      --shadow: 0 24px 64px rgba(28, 78, 116, .16);
+      --shadow-hover: 0 34px 80px rgba(28, 78, 116, .22);
+      --radius: 8px;
+      --nav-height: 72px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Arial, sans-serif;
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
-      color: var(--ink);
+      color: var(--glacier-950);
+      font-family: var(--sans);
+      letter-spacing: 0;
       background:
-        linear-gradient(90deg, rgba(15,118,110,.08) 0 1px, transparent 1px 100%) 0 0 / 44px 44px,
-        linear-gradient(180deg, rgba(15,118,110,.06), transparent 260px),
-        var(--paper);
-      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        radial-gradient(1200px 680px at 50% -180px, rgba(113, 185, 230, .34), transparent 68%),
+        linear-gradient(135deg, #fafdff 0%, #eef8ff 42%, #f7fbff 100%);
+      overflow-x: hidden;
     }
-    header, main { width: min(1120px, calc(100vw - 40px)); margin: 0 auto; }
-    header { padding: 44px 0 26px; }
-    .kicker { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-    h1 { margin: 10px 0 10px; font-size: clamp(32px, 5vw, 56px); line-height: 1.02; letter-spacing: 0; }
-    .summary { max-width: 760px; color: var(--muted); font-size: 16px; line-height: 1.7; margin: 0; }
-    .toolbar {
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(43, 111, 159, .055) 1px, transparent 1px) 0 0 / 56px 56px,
+        linear-gradient(180deg, rgba(43, 111, 159, .045) 1px, transparent 1px) 0 0 / 56px 56px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.85), rgba(0,0,0,.22) 58%, transparent 100%);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: var(--nav-height);
+      border-bottom: 1px solid var(--line);
+      background: rgba(250, 253, 255, .72);
+      backdrop-filter: blur(22px) saturate(1.35);
+      -webkit-backdrop-filter: blur(22px) saturate(1.35);
+    }
+
+    .topbar-inner {
+      width: min(1440px, calc(100vw - 32px));
+      height: 100%;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border: 1px solid rgba(255,255,255,.82);
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      background: linear-gradient(145deg, #2b6f9f, #80cdf1);
+      box-shadow: 0 14px 30px rgba(43, 111, 159, .22), inset 0 1px 0 rgba(255,255,255,.46);
+    }
+
+    .brand-title {
+      min-width: 0;
+    }
+
+    .brand-title strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-title span {
+      display: block;
+      margin-top: 2px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--glacier-800);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .nav-links a,
+    .nav-links button {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid rgba(125, 165, 196, .28);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.52);
+      color: var(--glacier-800);
+      text-decoration: none;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .nav-links a:hover,
+    .nav-links button:hover {
+      border-color: rgba(43, 111, 159, .46);
+      background: rgba(255,255,255,.76);
+    }
+
+    .shell {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 30px 0 44px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .hero-main,
+    .hero-panel,
+    .side,
+    .content,
+    .inspector {
+      border: 1px solid rgba(255,255,255,.74);
+      border-radius: var(--radius);
+      background: var(--glass);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px) saturate(1.32);
+      -webkit-backdrop-filter: blur(24px) saturate(1.32);
+    }
+
+    .hero-main {
+      min-height: 230px;
+      padding: clamp(24px, 4vw, 44px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(43, 111, 159, .4), transparent);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--glacier-600);
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(36px, 6vw, 72px);
+      line-height: 1;
+      letter-spacing: 0;
+      color: var(--glacier-950);
+    }
+
+    .hero-copy {
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.75;
+    }
+
+    .search-row {
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 12px;
+      gap: 10px;
       align-items: center;
-      margin: 24px 0 18px;
+      margin-top: 28px;
+      max-width: 780px;
     }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+
     input[type="search"] {
       width: 100%;
-      height: 44px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 0 14px;
-      font-size: 15px;
-      background: var(--panel);
-      color: var(--ink);
+      height: 48px;
+      border: 1px solid rgba(125, 165, 196, .34);
+      border-radius: var(--radius);
+      padding: 0 14px 0 42px;
+      background: rgba(255,255,255,.68);
+      color: var(--glacier-950);
       outline: none;
+      font: 15px var(--sans);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.72);
     }
-    input[type="search"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15,118,110,.14); }
-    .count { color: var(--muted); font-size: 14px; white-space: nowrap; }
-    .layout { display: grid; grid-template-columns: 280px 1fr; gap: 18px; align-items: start; padding-bottom: 48px; }
-    .panel { background: rgba(255,255,255,.88); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
-    aside { position: sticky; top: 18px; padding: 16px; }
-    aside h2, .content h2 { margin: 0 0 12px; font-size: 15px; }
-    .tree { list-style: none; padding: 0; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.8; }
-    .tree ul { list-style: none; margin: 0 0 0 18px; padding: 0 0 0 12px; border-left: 1px solid var(--line); }
-    .tree a { color: var(--ink); text-decoration: none; }
-    .tree a:hover { color: var(--accent); text-decoration: underline; }
-    .folder { color: var(--accent); font-weight: 700; }
-    .content { padding: 18px; }
-    .date-group { border-top: 1px solid var(--line); padding: 18px 0 2px; }
-    .date-group:first-of-type { border-top: 0; padding-top: 0; }
-    .date-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
-    .date-head h3 { margin: 0; font-size: 20px; }
-    .date-head span { color: var(--muted); font-size: 13px; }
-    .doc-list { display: grid; gap: 10px; }
-    .doc {
+
+    input[type="search"]:focus {
+      border-color: rgba(43, 111, 159, .62);
+      box-shadow: 0 0 0 4px rgba(113, 185, 230, .2), inset 0 1px 0 rgba(255,255,255,.72);
+    }
+
+    .clear-button {
+      height: 48px;
+      border: 1px solid rgba(125, 165, 196, .34);
+      border-radius: var(--radius);
+      padding: 0 16px;
+      color: var(--glacier-800);
+      background: rgba(255,255,255,.64);
+      font: 700 14px var(--sans);
+      cursor: pointer;
+    }
+
+    .clear-button:hover {
+      background: rgba(255,255,255,.86);
+      border-color: rgba(43, 111, 159, .52);
+    }
+
+    .hero-panel {
+      padding: 22px;
       display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 12px;
-      align-items: center;
-      padding: 13px 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      text-decoration: none;
-      color: var(--ink);
+      align-content: space-between;
+      gap: 20px;
     }
-    .doc:hover { border-color: rgba(15,118,110,.45); box-shadow: 0 10px 24px rgba(15,118,110,.08); }
-    .badge { min-width: 42px; padding: 4px 8px; border-radius: 6px; text-align: center; background: var(--accent-soft); color: var(--accent); font: 700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .doc-title { font-weight: 700; overflow-wrap: anywhere; }
-    .doc-path { color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin-top: 3px; overflow-wrap: anywhere; }
-    .arrow { color: var(--muted); font-size: 18px; }
-    .empty { padding: 30px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; background: rgba(255,255,255,.66); }
-    @media (max-width: 820px) {
-      header, main { width: min(100vw - 24px, 1120px); }
-      .toolbar, .layout { grid-template-columns: 1fr; }
-      aside { position: static; }
-      .doc { grid-template-columns: auto 1fr; }
-      .arrow { display: none; }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      min-height: 88px;
+      padding: 14px;
+      border: 1px solid rgba(125, 165, 196, .22);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.46);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+      color: var(--glacier-950);
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .latest-link {
+      display: block;
+      padding: 14px;
+      border-radius: var(--radius);
+      color: var(--glacier-950);
+      text-decoration: none;
+      background: linear-gradient(135deg, rgba(255,255,255,.74), rgba(217,238,251,.62));
+      border: 1px solid rgba(125, 165, 196, .28);
+    }
+
+    .latest-link span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .latest-link strong {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 260px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .side,
+    .content,
+    .inspector {
+      padding: 18px;
+    }
+
+    .side,
+    .inspector {
+      position: sticky;
+      top: calc(var(--nav-height) + 18px);
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title h2 {
+      margin: 0;
+      font-size: 15px;
+      color: var(--glacier-950);
+    }
+
+    .panel-title span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tree {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.9;
+      color: var(--glacier-800);
+      max-height: calc(100vh - 180px);
+      overflow: auto;
+    }
+
+    .tree ul {
+      list-style: none;
+      margin: 0 0 0 14px;
+      padding: 0 0 0 12px;
+      border-left: 1px solid rgba(125, 165, 196, .28);
+    }
+
+    .tree a {
+      display: inline-block;
+      max-width: 200px;
+      color: var(--glacier-950);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      white-space: nowrap;
+    }
+
+    .tree a:hover {
+      color: var(--glacier-600);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .folder {
+      color: var(--glacier-600);
+      font-weight: 800;
+    }
+
+    .content {
+      min-width: 0;
+    }
+
+    .date-group + .date-group {
+      margin-top: 26px;
+      padding-top: 22px;
+      border-top: 1px solid rgba(125, 165, 196, .24);
+    }
+
+    .date-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .date-head h3 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+      color: var(--glacier-950);
+    }
+
+    .date-head span {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .doc-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      perspective: 1200px;
+    }
+
+    .doc-card {
+      min-height: 160px;
+      display: grid;
+      align-content: space-between;
+      gap: 18px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.76);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(236,248,255,.54));
+      color: var(--glacier-950);
+      text-decoration: none;
+      box-shadow: 0 14px 34px rgba(28, 78, 116, .11);
+      transform: translateY(0) rotateX(0) rotateY(0) scale(1);
+      transform-style: preserve-3d;
+      transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease, background .22s ease;
+      will-change: transform;
+    }
+
+    .doc-card:hover {
+      border-color: rgba(113, 185, 230, .72);
+      background: linear-gradient(145deg, rgba(255,255,255,.86), rgba(226,245,255,.72));
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-6px) rotateX(2deg) rotateY(-2deg) scale(1.018);
+    }
+
+    .doc-card:focus-visible,
+    .clear-button:focus-visible,
+    .nav-links a:focus-visible,
+    .nav-links button:focus-visible {
+      outline: 3px solid rgba(43, 111, 159, .34);
+      outline-offset: 3px;
+    }
+
+    .doc-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .seq {
+      min-width: 48px;
+      height: 30px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: var(--radius);
+      color: #fff;
+      background: linear-gradient(135deg, #2b6f9f, #71b9e6);
+      font: 800 13px var(--mono);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.36);
+    }
+
+    .date-pill {
+      color: var(--muted);
+      font: 12px var(--mono);
+    }
+
+    .doc-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .doc-path {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font: 12px/1.55 var(--mono);
+      overflow-wrap: anywhere;
+    }
+
+    .inspector-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inspector-list a {
+      display: block;
+      padding: 12px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      background: rgba(255,255,255,.44);
+      border: 1px solid rgba(125, 165, 196, .24);
+    }
+
+    .inspector-list a:hover {
+      border-color: rgba(43, 111, 159, .45);
+      background: rgba(255,255,255,.72);
+    }
+
+    .inspector-list strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .inspector-list span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font: 11px var(--mono);
+    }
+
+    .empty {
+      padding: 34px;
+      border: 1px dashed rgba(125, 165, 196, .42);
+      border-radius: var(--radius);
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255,255,255,.48);
+    }
+
+    @media (max-width: 1180px) {
+      .grid {
+        grid-template-columns: 250px minmax(0, 1fr);
+      }
+
+      .inspector {
+        grid-column: 1 / -1;
+        position: static;
+      }
+
+      .inspector-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 860px) {
+      .topbar-inner,
+      .shell {
+        width: min(100vw - 24px, 1440px);
+      }
+
+      .topbar {
+        height: auto;
+        min-height: var(--nav-height);
+      }
+
+      .topbar-inner {
+        padding: 12px 0;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav-links {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+
+      .hero,
+      .grid,
+      .doc-list,
+      .inspector-list {
+        grid-template-columns: 1fr;
+      }
+
+      .side,
+      .inspector {
+        position: static;
+      }
+
+      .tree {
+        max-height: 320px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .shell {
+        padding-top: 18px;
+      }
+
+      .hero-main,
+      .hero-panel,
+      .side,
+      .content,
+      .inspector {
+        padding: 16px;
+      }
+
+      .search-row,
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .hero-copy {
+        font-size: 14px;
+      }
+
+      .doc-card {
+        min-height: 142px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        transition-duration: .001ms !important;
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+      }
+
+      .doc-card:hover {
+        transform: none;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="kicker">liuys pages index</div>
-    <h1>HTML 文档索引</h1>
-    <p class="summary">这里按日期和序号展示通过 liuys-html-publisher 发布的 HTML 文档。每次发布都会写入一个新目录，并自动登记到这个索引页。</p>
-    <div class="toolbar">
-      <input id="search" type="search" placeholder="搜索标题、日期或路径" autocomplete="off">
-      <div class="count" id="count"></div>
+  <nav class="topbar" aria-label="主导航">
+    <div class="topbar-inner">
+      <a class="brand" href="./" aria-label="返回文档站首页">
+        <span class="brand-mark">L</span>
+        <span class="brand-title">
+          <strong>liuys HTML Pages</strong>
+          <span>Cloudflare Pages document shelf</span>
+        </span>
+      </a>
+      <div class="nav-links">
+        <a href="#docs">文档</a>
+        <a href="#tree">目录树</a>
+        <button type="button" id="copyHome">复制地址</button>
+      </div>
     </div>
-  </header>
-  <main class="layout">
-    <aside class="panel">
-      <h2>目录树</h2>
-      <ul class="tree" id="tree"></ul>
-    </aside>
-    <section class="panel content">
-      <h2>已发布文档</h2>
-      <div id="docs"></div>
+  </nav>
+
+  <div class="shell">
+    <section class="hero" aria-labelledby="pageTitle">
+      <div class="hero-main">
+        <p class="eyebrow">Glacier index</p>
+        <h1 id="pageTitle">HTML 文档索引</h1>
+        <p class="hero-copy">一个轻量的文档发布入口。页面按日期和序号整理，通过 liuys-html-publisher 发布的 HTML 会自动写入这里，并在 Cloudflare Pages 上可访问。</p>
+        <div class="search-row">
+          <div class="search-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10.8 18.1a7.3 7.3 0 1 1 0-14.6 7.3 7.3 0 0 1 0 14.6Zm5.2-1.5 4.2 4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <input id="search" type="search" placeholder="搜索标题、日期或路径" autocomplete="off">
+          </div>
+          <button class="clear-button" type="button" id="clearSearch">清空</button>
+        </div>
+      </div>
+      <aside class="hero-panel" aria-label="文档概览">
+        <div class="metric-grid">
+          <div class="metric">
+            <strong id="totalCount">0</strong>
+            <span>已发布文档</span>
+          </div>
+          <div class="metric">
+            <strong id="dateCount">0</strong>
+            <span>发布日期</span>
+          </div>
+        </div>
+        <a class="latest-link" id="latestLink" href="#">
+          <span>最新文档</span>
+          <strong id="latestTitle">暂无文档</strong>
+        </a>
+      </aside>
     </section>
-  </main>
+
+    <section class="grid" aria-label="文档列表">
+      <aside class="side" id="tree">
+        <div class="panel-title">
+          <h2>目录树</h2>
+          <span id="treeCount">0</span>
+        </div>
+        <ul class="tree" id="treeList"></ul>
+      </aside>
+
+      <main class="content" id="docs">
+        <div class="panel-title">
+          <h2>已发布文档</h2>
+          <span id="resultCount">0</span>
+        </div>
+        <div id="docsList"></div>
+      </main>
+
+      <aside class="inspector" aria-label="最新文档">
+        <div class="panel-title">
+          <h2>最近发布</h2>
+          <span>Top 5</span>
+        </div>
+        <ul class="inspector-list" id="recentList"></ul>
+      </aside>
+    </section>
+  </div>
+
   <script>
     const PAGES = [
     { date: "2026-06-26", seq: "001", title: "大文件存储 OSS → COS 迁移方案", path: "/20260626/001/oss-to-cos-migration-plan.html" },
@@ -145,6 +782,15 @@
       return haystack.includes(query.toLowerCase());
     };
 
+    const groupByDate = (pages) => {
+      const groups = new Map();
+      for (const page of pages) {
+        if (!groups.has(page.date)) groups.set(page.date, []);
+        groups.get(page.date).push(page);
+      }
+      return groups;
+    };
+
     const renderTree = (pages) => {
       const byDate = new Map();
       for (const page of pages) {
@@ -153,16 +799,20 @@
         if (!seqs.has(page.seq)) seqs.set(page.seq, []);
         seqs.get(page.seq).push(page);
       }
-      const tree = document.getElementById('tree');
+
+      const tree = document.getElementById('treeList');
       tree.innerHTML = '';
+
       for (const [date, seqs] of byDate) {
         const dateLi = document.createElement('li');
         dateLi.innerHTML = `<span class="folder">${date.replaceAll('-', '')}/</span>`;
         const seqUl = document.createElement('ul');
+
         for (const [seq, docs] of seqs) {
           const seqLi = document.createElement('li');
           seqLi.innerHTML = `<span class="folder">${seq}/</span>`;
           const docUl = document.createElement('ul');
+
           for (const doc of docs) {
             const docLi = document.createElement('li');
             const a = document.createElement('a');
@@ -172,43 +822,85 @@
             docLi.append(a);
             docUl.append(docLi);
           }
+
           seqLi.append(docUl);
           seqUl.append(seqLi);
         }
+
         dateLi.append(seqUl);
         tree.append(dateLi);
       }
     };
 
     const renderDocs = (pages) => {
-      const docs = document.getElementById('docs');
+      const docs = document.getElementById('docsList');
       docs.innerHTML = '';
+
       if (!pages.length) {
         docs.innerHTML = '<div class="empty">没有匹配的文档</div>';
         return;
       }
-      const groups = new Map();
-      for (const page of pages) {
-        if (!groups.has(page.date)) groups.set(page.date, []);
-        groups.get(page.date).push(page);
-      }
-      for (const [date, items] of groups) {
+
+      for (const [date, items] of groupByDate(pages)) {
         const group = document.createElement('section');
         group.className = 'date-group';
         group.innerHTML = `<div class="date-head"><h3>${date}</h3><span>${items.length} 个文档</span></div>`;
+
         const list = document.createElement('div');
         list.className = 'doc-list';
+
         for (const page of items) {
           const link = document.createElement('a');
-          link.className = 'doc';
+          link.className = 'doc-card';
           link.href = normalizeUrl(page.path);
-          link.innerHTML = `<span class="badge">${page.seq}</span><span><span class="doc-title"></span><span class="doc-path"></span></span><span class="arrow">→</span>`;
+          link.innerHTML = `
+            <span class="doc-top">
+              <span class="seq">${page.seq}</span>
+              <span class="date-pill">${page.date}</span>
+            </span>
+            <span>
+              <h4 class="doc-title"></h4>
+              <p class="doc-path"></p>
+            </span>
+          `;
           link.querySelector('.doc-title').textContent = page.title;
           link.querySelector('.doc-path').textContent = formatPath(page.path);
           list.append(link);
         }
+
         group.append(list);
         docs.append(group);
+      }
+    };
+
+    const renderRecent = (pages) => {
+      const recent = document.getElementById('recentList');
+      recent.innerHTML = '';
+
+      for (const page of pages.slice(0, 5)) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = normalizeUrl(page.path);
+        link.innerHTML = '<strong></strong><span></span>';
+        link.querySelector('strong').textContent = page.title;
+        link.querySelector('span').textContent = `${page.date}/${page.seq}`;
+        item.append(link);
+        recent.append(item);
+      }
+    };
+
+    const renderMetrics = (pages) => {
+      const allDates = new Set(PAGES.map((page) => page.date));
+      const latest = sortedPages()[0];
+      document.getElementById('totalCount').textContent = PAGES.length;
+      document.getElementById('dateCount').textContent = allDates.size;
+      document.getElementById('treeCount').textContent = `${pages.length} nodes`;
+      document.getElementById('resultCount').textContent = `${pages.length} / ${PAGES.length}`;
+
+      if (latest) {
+        const latestLink = document.getElementById('latestLink');
+        latestLink.href = normalizeUrl(latest.path);
+        document.getElementById('latestTitle').textContent = latest.title;
       }
     };
 
@@ -217,10 +909,24 @@
       const pages = sortedPages().filter((page) => !query || matchPage(page, query));
       renderTree(pages);
       renderDocs(pages);
-      document.getElementById('count').textContent = `${pages.length} / ${PAGES.length} 个文档`;
+      renderRecent(sortedPages());
+      renderMetrics(pages);
     };
 
     document.getElementById('search').addEventListener('input', render);
+    document.getElementById('clearSearch').addEventListener('click', () => {
+      document.getElementById('search').value = '';
+      render();
+      document.getElementById('search').focus();
+    });
+    document.getElementById('copyHome').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(location.href);
+      } catch (error) {
+        window.prompt('复制地址', location.href);
+      }
+    });
+
     render();
   </script>
 </body>
