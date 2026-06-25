@@ -166,7 +166,8 @@
             const docLi = document.createElement('li');
             const a = document.createElement('a');
             a.href = normalizeUrl(doc.path);
-            a.textContent = doc.path.split('/').pop();
+            a.title = formatPath(doc.path);
+            a.textContent = doc.title;
             docLi.append(a);
             docUl.append(docLi);
           }
