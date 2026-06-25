@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Range 视频播放演示</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #1f2933;
+      --muted: #627386;
+      --line: #d9e0e8;
+      --accent: #126f83;
+      --accent-dark: #0d5665;
+      --warn: #a55310;
+      --bad: #b42318;
+      --good: #13795b;
+      --code-bg: #111827;
+      --code-text: #e5edf6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 22px 24px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    section {
+      margin-bottom: 16px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    h3 {
+      margin: 16px 0 8px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    textarea,
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 11px;
+      color: var(--text);
+      background: #fff;
+      font: inherit;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+      word-break: break-all;
+    }
+
+    button {
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: #fff;
+      background: var(--accent);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--accent-dark);
+    }
+
+    button.secondary {
+      color: var(--accent);
+      background: #fff;
+    }
+
+    button.secondary:hover {
+      color: #fff;
+      background: var(--accent);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      max-height: 520px;
+      background: #000;
+      border-radius: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    th {
+      width: 150px;
+      color: var(--muted);
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    pre {
+      margin: 0;
+      padding: 12px;
+      overflow: auto;
+      max-height: 360px;
+      color: var(--code-text);
+      background: var(--code-bg);
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .row > * {
+      flex: 0 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+      gap: 16px;
+    }
+
+    .fields {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .note {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef6f7;
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .status {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status.good {
+      color: var(--good);
+      border-color: #b8e0d2;
+      background: #f0faf6;
+    }
+
+    .status.warn {
+      color: var(--warn);
+      border-color: #f2d0aa;
+      background: #fff8ed;
+    }
+
+    .status.bad {
+      color: var(--bad);
+      border-color: #f4b8b1;
+      background: #fff4f2;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 12px;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .nowrap {
+      white-space: nowrap;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        padding: 12px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .fields {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        padding: 18px 14px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Range 视频播放演示</h1>
+    <p>输入 FilesOne 签名 URL，模拟前端 video 播放，并用手动 Range 请求验证服务端返回的字节区间。</p>
+  </header>
+
+  <main>
+    <section>
+      <label for="urlInput">视频 URL</label>
+      <textarea id="urlInput" spellcheck="false" placeholder="粘贴 /FilesOne/Anonymity/Sign?... URL"></textarea>
+      <div class="row" style="margin-top: 10px;">
+        <button id="startBtn" type="button">开始展示</button>
+        <button id="clearBtn" type="button" class="secondary">清空日志</button>
+        <span id="pageStatus" class="badge">未开始</span>
+      </div>
+      <p class="note">
+        前端业务接入通常只需要把签名 URL 放到 video 的 src。播放和拖动时的 Range 请求由浏览器自动发出，
+        实际 request header 请在 DevTools Network 中查看。
+      </p>
+    </section>
+
+    <section>
+      <h2>前端接入方式（仅供参考）</h2>
+      <pre>&lt;video controls playsinline preload="metadata" src="签名URL"&gt;&lt;/video&gt;</pre>
+      <table style="margin-top: 12px;">
+        <tbody>
+          <tr>
+            <th>业务代码</th>
+            <td>下面写法仅用于说明最基础的视频播放方式。实际项目可以按自己的组件封装，通常不需要手写 <code>Range</code> 请求头；浏览器会根据播放、缓冲、拖动行为自动请求。</td>
+          </tr>
+          <tr>
+            <th>本页用途</th>
+            <td>上方 video 用于模拟真实接入；下方 Range 测试按钮用于验收服务端是否正确返回 <code>206</code>、<code>Content-Range</code> 和指定字节段。</td>
+          </tr>
+          <tr>
+            <th>看请求</th>
+            <td>video 标签自己发出的 Range header 只能在 DevTools Network 中查看；页面按钮发出的 Range 是手动验证请求。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="grid">
+      <section>
+        <h2>视频播放</h2>
+        <video id="video" controls playsinline preload="metadata"></video>
+        <div id="videoStatus" class="status">等待输入 URL。</div>
+        <h3>播放事件</h3>
+        <pre id="eventLog"></pre>
+      </section>
+
+      <section>
+        <h2>URL 参数说明</h2>
+        <table>
+          <tbody id="paramTable"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <section>
+      <h2>Range 请求测试</h2>
+      <p class="note">
+        这些按钮会用 fetch 对同一个 URL 发起带 Range header 的请求。它们不是业务播放代码，只用于证明服务端如何响应指定 Range。
+        若目标接口未允许跨域读取响应头，浏览器会报 CORS 错误；这不等于 video 不能播放。
+      </p>
+
+      <div class="fields">
+        <div>
+          <label for="startByte">开始字节 start</label>
+          <input id="startByte" type="number" min="0" step="1" value="8683520">
+        </div>
+        <div>
+          <label for="endByte">结束字节 end</label>
+          <input id="endByte" type="number" min="0" step="1" value="9732095">
+        </div>
+        <div>
+          <label for="chunkSize">当前位置块大小 bytes</label>
+          <input id="chunkSize" type="number" min="1" step="1" value="1048576">
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="probeBtn" type="button" class="secondary">探测总大小 bytes=0-0</button>
+        <button id="firstKbBtn" type="button" class="secondary">请求前 1KB</button>
+        <button id="customRangeBtn" type="button">请求指定区间</button>
+        <button id="currentChunkBtn" type="button" class="secondary">请求当前位置后一个块</button>
+        <button id="openEndedBtn" type="button" class="secondary">请求 open-ended</button>
+      </div>
+
+      <div id="rangeStatus" class="status">还没有发起 Range 请求。</div>
+
+      <h3>最近一次 Range 请求结果</h3>
+      <pre id="rangeResult"></pre>
+
+      <h3>说明</h3>
+      <table>
+        <tbody>
+          <tr>
+            <th>有限区间</th>
+            <td><code>Range: bytes=8683520-9732095</code> 只返回这一段。响应通常是 <code>206</code>，<code>Content-Length</code> 等于这一段长度。</td>
+          </tr>
+          <tr>
+            <th>open-ended</th>
+            <td><code>Range: bytes=8683520-</code> 表示从 start 到文件末尾。当前服务端会返回后面所有字节。</td>
+          </tr>
+          <tr>
+            <th>拖动进度条</th>
+            <td>拖动后浏览器通常会重新发 Range 请求，但具体是有限区间还是 open-ended，由浏览器实现决定，前端通常不手动控制。</td>
+          </tr>
+          <tr>
+            <th>服务端判断</th>
+            <td>关键看响应头：<code>Status=206</code>、<code>Accept-Ranges=bytes</code>、<code>Content-Range=bytes start-end/total</code>。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const defaultUrl = "https://img.ceshi112.com/FilesOne/Anonymity/Sign?Fid=A18DBB60A51B0E125ACEEB2DA21CD037D799013A3488F0086B9CEDD919EAE0AF116F365B0FBB1CC27B1225159EC3EBC9CE111AAC737D70CC0E0681F854223561&Acid=93789.1000&Ets=1844339722261&Ak=47T6EuQ1YKVMc2sGWTJFN5oW&Fn=N_202606_11_5fe7c5301c58469c8cf86093542cb38c.mp4&Bn=openApi&Sig=bMaP2k72wN7qDt4TVwN5raAZqIM%3D&Ds=KEZ2k5AXPzHjTV7XxMQL8A%3D%3D&acModel=inline";
+
+    const paramDescriptions = {
+      Fid: "文件 ID，加密后的文件路径/签名信息。",
+      Acid: "访问身份链，常见格式为 enterpriseAccount.employeeId。",
+      Ets: "过期时间戳，毫秒。",
+      Ak: "Access Key。",
+      Fn: "文件名，影响文件类型识别和展示文件名。",
+      Bn: "业务线标识。",
+      Sig: "访问签名，用 SK 对签名原文生成。",
+      Ds: "参数摘要，用于校验 URL 参数没有被改动。",
+      acModel: "展示方式，常见值：inline、attachment、preview。"
+    };
+
+    const urlInput = document.getElementById("urlInput");
+    const startBtn = document.getElementById("startBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const pageStatus = document.getElementById("pageStatus");
+    const video = document.getElementById("video");
+    const videoStatus = document.getElementById("videoStatus");
+    const eventLog = document.getElementById("eventLog");
+    const paramTable = document.getElementById("paramTable");
+    const probeBtn = document.getElementById("probeBtn");
+    const firstKbBtn = document.getElementById("firstKbBtn");
+    const customRangeBtn = document.getElementById("customRangeBtn");
+    const currentChunkBtn = document.getElementById("currentChunkBtn");
+    const openEndedBtn = document.getElementById("openEndedBtn");
+    const startByte = document.getElementById("startByte");
+    const endByte = document.getElementById("endByte");
+    const chunkSize = document.getElementById("chunkSize");
+    const rangeStatus = document.getElementById("rangeStatus");
+    const rangeResult = document.getElementById("rangeResult");
+
+    let currentUrl = "";
+    let totalLength = null;
+
+    urlInput.value = defaultUrl;
+    renderParamTable(defaultUrl);
+
+    startBtn.addEventListener("click", () => {
+      currentUrl = urlInput.value.trim();
+      if (!currentUrl) {
+        setStatus(pageStatus, "请输入 URL", "warn");
+        setBox(videoStatus, "URL 为空。", "bad");
+        return;
+      }
+
+      video.src = currentUrl;
+      video.load();
+      totalLength = null;
+      renderParamTable(currentUrl);
+      setStatus(pageStatus, "已加载 URL", "good");
+      setBox(videoStatus, "视频 URL 已设置。可以播放或拖动进度条。", "good");
+      logEvent("set video src");
+    });
+
+    clearBtn.addEventListener("click", () => {
+      eventLog.textContent = "";
+      rangeResult.textContent = "";
+      setBox(rangeStatus, "还没有发起 Range 请求。", "");
+    });
+
+    probeBtn.addEventListener("click", () => runRange("bytes=0-0"));
+    firstKbBtn.addEventListener("click", () => runRange("bytes=0-1023"));
+    customRangeBtn.addEventListener("click", () => {
+      const start = parseInteger(startByte.value);
+      const end = parseInteger(endByte.value);
+      if (start === null || end === null || end < start) {
+        setBox(rangeStatus, "指定区间不合法。start/end 必须是非负整数，且 end >= start。", "bad");
+        return;
+      }
+      runRange(`bytes=${start}-${end}`);
+    });
+    openEndedBtn.addEventListener("click", () => {
+      const start = parseInteger(startByte.value);
+      if (start === null) {
+        setBox(rangeStatus, "start 不合法。", "bad");
+        return;
+      }
+      runRange(`bytes=${start}-`);
+    });
+    currentChunkBtn.addEventListener("click", async () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) {
+        setBox(rangeStatus, "还没有读取到视频 duration，先播放或等待 loadedmetadata。", "warn");
+        return;
+      }
+      if (totalLength === null) {
+        const ok = await runRange("bytes=0-0", { silentStatus: true });
+        if (!ok || totalLength === null) {
+          setBox(rangeStatus, "无法探测 totalLength，不能按当前位置估算字节区间。", "bad");
+          return;
+        }
+      }
+
+      const size = parseInteger(chunkSize.value);
+      if (size === null || size <= 0) {
+        setBox(rangeStatus, "块大小不合法。", "bad");
+        return;
+      }
+
+      const start = Math.min(Math.floor(video.currentTime / video.duration * totalLength), totalLength - 1);
+      const end = Math.min(start + size - 1, totalLength - 1);
+      startByte.value = String(start);
+      endByte.value = String(end);
+      runRange(`bytes=${start}-${end}`);
+    });
+
+    [
+      "loadstart",
+      "loadedmetadata",
+      "durationchange",
+      "canplay",
+      "play",
+      "pause",
+      "seeking",
+      "seeked",
+      "waiting",
+      "playing",
+      "progress",
+      "error"
+    ].forEach((name) => {
+      video.addEventListener(name, () => {
+        const buffered = formatBuffered(video);
+        const duration = Number.isFinite(video.duration) ? video.duration.toFixed(3) : "n/a";
+        const currentTime = Number.isFinite(video.currentTime) ? video.currentTime.toFixed(3) : "n/a";
+        logEvent(`${name} currentTime=${currentTime} duration=${duration} buffered=${buffered}`);
+        if (name === "loadedmetadata") {
+          setBox(videoStatus, `已读取视频元数据，duration=${duration}s。拖动进度条后可在 DevTools Network 查看浏览器自己的 Range 请求。`, "good");
+        }
+        if (name === "error") {
+          const code = video.error ? video.error.code : "unknown";
+          setBox(videoStatus, `视频加载失败，MediaError code=${code}。`, "bad");
+        }
+      });
+    });
+
+    async function runRange(rangeHeader, options = {}) {
+      const url = getCurrentUrl();
+      if (!url) {
+        setBox(rangeStatus, "请输入 URL 并点击开始展示，或至少在输入框中填入 URL。", "warn");
+        return false;
+      }
+
+      if (!options.silentStatus) {
+        setBox(rangeStatus, `正在请求 ${rangeHeader} ...`, "");
+      }
+      rangeResult.textContent = `Request URL:\n${url}\n\nRequest Header:\nRange: ${rangeHeader}\n`;
+
+      const startedAt = performance.now();
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Range: rangeHeader
+          },
+          cache: "no-store"
+        });
+        const buffer = await response.arrayBuffer();
+        const elapsed = Math.round(performance.now() - startedAt);
+        const headers = pickHeaders(response);
+        const parsedTotal = parseTotalLength(headers["content-range"]);
+        if (parsedTotal !== null) {
+          totalLength = parsedTotal;
+        }
+
+        const expectedLength = expectedLengthFromContentRange(headers["content-range"]);
+        const lines = [];
+        lines.push("Request Header:");
+        lines.push(`Range: ${rangeHeader}`);
+        lines.push("");
+        lines.push("Response:");
+        lines.push(`status: ${response.status} ${response.statusText}`);
+        Object.entries(headers).forEach(([key, value]) => lines.push(`${key}: ${value || "(empty)"}`));
+        lines.push("");
+        lines.push(`receivedBytes: ${buffer.byteLength}`);
+        if (expectedLength !== null) {
+          lines.push(`rangeLengthFromContentRange: ${expectedLength}`);
+          lines.push(`lengthMatched: ${expectedLength === buffer.byteLength}`);
+        }
+        if (totalLength !== null) {
+          lines.push(`totalLength: ${totalLength}`);
+        }
+        lines.push(`elapsedMs: ${elapsed}`);
+        lines.push("");
+        lines.push(explainRange(rangeHeader, headers["content-range"], buffer.byteLength));
+        rangeResult.textContent = lines.join("\n");
+
+        const statusClass = response.status === 206 ? "good" : "warn";
+        setBox(rangeStatus, `请求完成：HTTP ${response.status}，收到 ${formatBytes(buffer.byteLength)}。`, statusClass);
+        return response.ok || response.status === 206 || response.status === 416;
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        rangeResult.textContent += `\nFetch Error:\n${message}\n\n可能原因：目标接口未允许跨域请求，或浏览器禁止静态页面读取该响应。视频播放本身可以单独验证。`;
+        setBox(rangeStatus, `Range 请求失败：${message}`, "bad");
+        return false;
+      }
+    }
+
+    function renderParamTable(rawUrl) {
+      paramTable.innerHTML = "";
+      let url;
+      try {
+        url = new URL(rawUrl);
+      } catch (error) {
+        paramTable.innerHTML = `<tr><th>URL</th><td class="bad">URL 格式不合法</td></tr>`;
+        return;
+      }
+
+      const rows = [
+        ["接口地址", `${url.origin}${url.pathname}`, "FilesOne 文件访问接口。"],
+        ["完整 URL", rawUrl, "实际用于 video src 和 Range fetch 的地址。"]
+      ];
+
+      Object.keys(paramDescriptions).forEach((key) => {
+        rows.push([key, url.searchParams.get(key) || "", paramDescriptions[key]]);
+      });
+
+      rows.forEach(([name, value, desc]) => {
+        const tr = document.createElement("tr");
+        const th = document.createElement("th");
+        const td = document.createElement("td");
+        th.textContent = name;
+        td.innerHTML = `<div class="mono">${escapeHtml(value || "(空)")}</div><div class="muted small">${escapeHtml(desc)}</div>`;
+        tr.appendChild(th);
+        tr.appendChild(td);
+        paramTable.appendChild(tr);
+      });
+    }
+
+    function getCurrentUrl() {
+      return currentUrl || urlInput.value.trim();
+    }
+
+    function pickHeaders(response) {
+      const names = [
+        "accept-ranges",
+        "content-range",
+        "content-length",
+        "content-type",
+        "content-disposition",
+        "content-encoding"
+      ];
+      const result = {};
+      names.forEach((name) => {
+        result[name] = response.headers.get(name);
+      });
+      return result;
+    }
+
+    function parseTotalLength(contentRange) {
+      if (!contentRange) {
+        return null;
+      }
+      const match = contentRange.match(/\/(\d+)$/);
+      return match ? Number(match[1]) : null;
+    }
+
+    function expectedLengthFromContentRange(contentRange) {
+      if (!contentRange) {
+        return null;
+      }
+      const match = contentRange.match(/bytes\s+(\d+)-(\d+)\/(\d+|\*)/i);
+      if (!match) {
+        return null;
+      }
+      return Number(match[2]) - Number(match[1]) + 1;
+    }
+
+    function explainRange(rangeHeader, contentRange, receivedBytes) {
+      const lines = [];
+      lines.push("Interpretation:");
+      if (rangeHeader.endsWith("-")) {
+        lines.push("- open-ended Range：服务端会从 start 返回到文件末尾，除非服务端主动限制。");
+      } else {
+        lines.push("- 有限 Range：服务端只返回 start-end 这一块。");
+      }
+      if (contentRange) {
+        lines.push(`- Content-Range 说明实际返回区间：${contentRange}`);
+      }
+      lines.push(`- 本次 fetch 实际读取 ${receivedBytes} bytes。`);
+      return lines.join("\n");
+    }
+
+    function formatBuffered(media) {
+      const ranges = [];
+      for (let i = 0; i < media.buffered.length; i += 1) {
+        ranges.push(`${media.buffered.start(i).toFixed(3)}-${media.buffered.end(i).toFixed(3)}`);
+      }
+      return ranges.length ? ranges.join(",") : "none";
+    }
+
+    function logEvent(message) {
+      const now = new Date();
+      const time = now.toLocaleTimeString("zh-CN", { hour12: false });
+      eventLog.textContent += `[${time}] ${message}\n`;
+      eventLog.scrollTop = eventLog.scrollHeight;
+    }
+
+    function parseInteger(value) {
+      if (!/^\d+$/.test(String(value).trim())) {
+        return null;
+      }
+      const number = Number(value);
+      return Number.isSafeInteger(number) ? number : null;
+    }
+
+    function setStatus(element, text, type) {
+      element.textContent = text;
+      element.className = "badge";
+      if (type === "warn") {
+        element.style.background = "#fff8ed";
+        element.style.color = "#a55310";
+      } else if (type === "good") {
+        element.style.background = "#f0faf6";
+        element.style.color = "#13795b";
+      } else if (type === "bad") {
+        element.style.background = "#fff4f2";
+        element.style.color = "#b42318";
+      } else {
+        element.style.background = "#eef6f7";
+        element.style.color = "#0d5665";
+      }
+    }
+
+    function setBox(element, text, type) {
+      element.textContent = text;
+      element.className = `status${type ? ` ${type}` : ""}`;
+    }
+
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes)) {
+        return "n/a";
+      }
+      if (bytes < 1024) {
+        return `${bytes} B`;
+      }
+      if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(2)} KB`;
+      }
+      return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>
