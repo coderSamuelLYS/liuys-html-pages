@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fs-stone 错误日志治理进度报告</title>
+<style>
+  :root{
+    --bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;
+    --blue:#58a6ff;--green:#3fb950;--yellow:#d29922;--red:#f85149;--purple:#bc8cff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;padding:24px;max-width:1080px;margin:0 auto}
+  h1{font-size:1.7rem;margin-bottom:6px;color:#fff}
+  h2{font-size:1.25rem;margin:32px 0 14px;color:var(--blue);border-bottom:1px solid var(--border);padding-bottom:8px}
+  h3{font-size:1.05rem;margin:20px 0 10px;color:var(--purple)}
+  .meta{color:var(--muted);font-size:.85rem;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;margin:12px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center}
+  .stat .num{font-size:1.8rem;font-weight:700}
+  .stat .lbl{color:var(--muted);font-size:.8rem;margin-top:4px}
+  .b{color:var(--blue)} .g{color:var(--green)} .y{color:var(--yellow)} .r{color:var(--red)} .p{color:var(--purple)}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.88rem}
+  th,td{border:1px solid var(--border);padding:9px 12px;text-align:left}
+  th{background:#21262d;color:#fff;font-weight:600}
+  tr:nth-child(even){background:#0d111780}
+  code{background:#21262d;padding:2px 6px;border-radius:4px;font-family:'SF Mono',Consolas,monospace;font-size:.85em;color:var(--green)}
+  .tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-right:4px}
+  .tag-done{background:#1b3a25;color:var(--green)}
+  .tag-progress{background:#3b2e14;color:var(--yellow)}
+  .tag-pending{background:#3b2424;color:var(--red)}
+  .tag-p0{background:#5c1d1d;color:#ff7b72}
+  .tag-p1{background:#3b2e14;color:var(--yellow)}
+  .tag-p2{background:#1a2f4a;color:var(--blue)}
+  .phase{border-left:3px solid var(--blue);padding-left:16px;margin:16px 0}
+  .phase-0{border-color:var(--red)} .phase-1{border-color:var(--yellow)} .phase-2{border-color:var(--blue)} .phase-3{border-color:var(--green)}
+  .bar{height:22px;border-radius:4px;background:var(--border);overflow:hidden;margin:6px 0}
+  .bar-fill{height:100%;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#000;font-weight:600;white-space:nowrap}
+  ul{padding-left:20px} li{margin:4px 0}
+  .warn-box{background:#3b2e14;border:1px solid var(--yellow);border-radius:6px;padding:12px 16px;margin:12px 0;font-size:.88rem}
+  .ok-box{background:#1b3a25;border:1px solid var(--green);border-radius:6px;padding:12px 16px;margin:12px 0;font-size:.88rem}
+  .footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:.8rem;text-align:center}
+  .timeline{position:relative;padding-left:24px}
+  .timeline::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--border)}
+  .tl-item{position:relative;margin-bottom:14px}
+  .tl-item::before{content:'';position:absolute;left:-24px;top:8px;width:10px;height:10px;border-radius:50%;background:var(--blue)}
+  .tl-item.done::before{background:var(--green)}
+  .tl-item.progress::before{background:var(--yellow)}
+  .mono{font-family:'SF Mono',Consolas,monospace;font-size:.82rem}
+</style>
+</head>
+<body>
+
+<h1>fs-stone 错误日志治理进度报告</h1>
+<div class="meta">
+  生成时间：2026-06-25 &nbsp;|&nbsp; 分支：<span class="mono">910-fix</span> &nbsp;|&nbsp; 范围：fileserver / proxy / metaserver 三服务
+</div>
+
+<!-- 概览 -->
+<h2>一、治理概览</h2>
+
+<div class="grid">
+  <div class="stat"><div class="num r">22.6万</div><div class="lbl">三服务 7天 ERROR（基线）</div></div>
+  <div class="stat"><div class="num y">6 处</div><div class="lbl">EOF 治理改动</div></div>
+  <div class="stat"><div class="num g">2/3</div><div class="lbl">Phase 0 任务完成</div></div>
+  <div class="stat"><div class="num b">95.8%</div><div class="lbl">三服务占全量比</div></div>
+</div>
+
+<div class="card">
+  <p><strong>治理目标</strong>：三服务 7 天 ERROR 总量从 <span class="r">22.6 万</span> → <span class="g">4 万以下</span>（4 周内）。</p>
+  <p><strong>治理原则</strong>：先降噪（客户端断连/业务可预期异常降 WARN）→ 再修根因（NPE/越界/数据安全）→ ERROR 只留需 on-call 介入的问题。</p>
+</div>
+
+<!-- 基线分布 -->
+<h2>二、基线与分布（2026-06-09 ~ 06-16）</h2>
+
+<table>
+  <tr><th>服务</th><th>7天 ERROR</th><th>日均</th><th>占比</th><th>主要问题</th></tr>
+  <tr><td class="r">fs-stone-fileserver</td><td>110,005</td><td>~15,715</td><td>46.6%</td><td>ClientAbortException（50,257）、水印空数据、日志参数错误</td></tr>
+  <tr><td class="r">fs-stone-proxy</td><td>108,990</td><td>~15,570</td><td>46.2%</td><td>StringIndexOutOfBoundsException、token='' 占 98.8%</td></tr>
+  <tr><td class="y">fs-stone-metaserver</td><td>6,898</td><td>~985</td><td>2.9%</td><td>JsonSyntaxException（4,179）、UnhandledException</td></tr>
+  <tr style="background:#21262d"><td><strong>本期合计</strong></td><td><strong>225,893</strong></td><td><strong>~32,270</strong></td><td><strong>95.8%</strong></td><td>—</td></tr>
+</table>
+<p class="meta" style="margin-top:6px">注：cgi / dataserver / cloud / upload-consumer 等服务已移出本期，转后续迭代。基线因 fx-ops CLI 直查入口不可用未实时刷新，沿用 06-16 报告。</p>
+
+<!-- 分阶段进度 -->
+<h2>三、分阶段进度</h2>
+
+<div class="phase phase-0">
+  <h3>Phase 0：紧急止血（第 1 周，P0 数据安全）</h3>
+  <div class="bar"><div class="bar-fill" style="background:var(--green);width:100%">100% 完成</div></div>
+  <table>
+    <tr><th>任务</th><th>状态</th><th>改动点</th></tr>
+    <tr>
+      <td>0.1 水印空数据写入 <span class="tag tag-p0">P0</span></td>
+      <td><span class="tag tag-done">✅ 已完成</span></td>
+      <td><code>NFileServiceImpl.java:779</code> makeWater 不再用 <code>new byte[0]</code> 继续做水印，改为抛 IO_EXCEPTION + 空流判空</td>
+    </tr>
+    <tr>
+      <td>0.2 日志参数错误 <span class="tag tag-p0">P0</span></td>
+      <td><span class="tag tag-done">✅ 已完成</span></td>
+      <td><code>NFileServiceImpl.java:162</code> <code>log.error("...{}", e)</code> → <code>("...{}", request, e)</code> 补回 request 上下文</td>
+    </tr>
+  </table>
+  <div class="ok-box">✅ 编译通过 + 单测通过（Tests run: 5, Failures: 0, Errors: 0）</div>
+</div>
+
+<div class="phase phase-1">
+  <h3>Phase 1：快速降噪（第 1-2 周，预计降噪 60%+）</h3>
+  <div class="bar"><div class="bar-fill" style="background:var(--yellow);width:55%">55% — EOF 代码已改，待上线验证</div></div>
+  <table>
+    <tr><th>任务</th><th>状态</th><th>说明</th></tr>
+    <tr>
+      <td>1.1 客户端中断降级为 WARN <span class="tag tag-p0">P0</span></td>
+      <td><span class="tag tag-progress">⏳ 代码就绪</span></td>
+      <td>AOP 三类 <code>isFail()</code> 覆盖（前序会话）+ Service 层 2 处堵漏（本次）</td>
+    </tr>
+    <tr>
+      <td>1.2 proxy token='' 日志定位与分级 <span class="tag tag-p0">P0</span></td>
+      <td><span class="tag tag-pending">⬜ 待处理</span></td>
+      <td>~10.7 万条 token='' 是本期单点最大降噪目标，需蜂眼平台按 loggerName 聚合定位</td>
+    </tr>
+    <tr>
+      <td>1.3 修复 zookeeper_8 配置缺失 <span class="tag tag-p0">P0</span></td>
+      <td><span class="tag tag-pending">⬜ 待处理</span></td>
+      <td>三服务配置加载阶段偶发，需确认废弃/补全</td>
+    </tr>
+    <tr>
+      <td>1.4 日志分级规范 <span class="tag tag-p0">P0</span></td>
+      <td><span class="tag tag-pending">⬜ 待处理</span></td>
+      <td>输出三服务日志分级规范文档</td>
+    </tr>
+  </table>
+</div>
+
+<div class="phase phase-2">
+  <h3>Phase 2：根因修复（第 2-4 周）</h3>
+  <div class="bar"><div class="bar-fill" style="background:var(--red);width:0%">0% 未开始</div></div>
+  <table>
+    <tr><th>任务</th><th>状态</th><th>代码定位</th></tr>
+    <tr><td>2.1 proxy StringIndexOutOfBounds <span class="tag tag-p1">P1</span></td><td><span class="tag tag-pending">⬜ 待处理</span></td><td><code>AvatarService.java:39</code> 无 <code>.</code> 时越界</td></tr>
+    <tr><td>2.2 metaserver 缓存 JSON 容错 <span class="tag tag-p1">P1</span></td><td><span class="tag tag-pending">⬜ 待处理</span></td><td><code>NMetaDataCacheImpl.java:70-88</code> 异常吞掉不清脏 key</td></tr>
+    <tr><td>2.3 fileserver 水印/上传 NPE 与日志上下文 <span class="tag tag-p1">P1</span></td><td><span class="tag tag-pending">⬜ 待处理</span></td><td>token='' 定位 + UndeclaredThrowableException 分级</td></tr>
+  </table>
+</div>
+
+<div class="phase phase-3">
+  <h3>Phase 3：长效防控（持续）</h3>
+  <div class="bar"><div class="bar-fill" style="background:var(--red);width:0%">0% 未开始</div></div>
+  <ul>
+    <li>3.1 日志规范 + 静态检查（三服务）</li>
+    <li>3.2 ERROR 日志监控告警（三服务）</li>
+    <li>3.3 ERROR 预算周报（三服务）</li>
+  </ul>
+</div>
+
+<!-- EOF 治理详情 -->
+<h2>四、EOF 治理详情（本轮重点落地）</h2>
+
+<div class="card">
+  <p><strong>背景</strong>：fileserver 的 <code>ClientAbortException</code> / <code>stream2byte exception</code> 基线 7 天 <span class="r">~50,257 条</span>（占该服务 45.7%），本质是客户端在服务端写流完成前断开（用户取消下载、网络中断），非服务端故障。</p>
+</div>
+
+<h3>两层治理：AOP 兜底 + Service 层堵漏</h3>
+
+<table>
+  <tr><th>层</th><th>治理点</th><th>文件</th><th>机制</th><th>来源</th></tr>
+  <tr>
+    <td rowspan="3" class="p"><strong>AOP 层</strong><br>Resource 层兜底</td>
+    <td>FileResourceProfile</td>
+    <td><code>fileserver/aop/FileResourceProfile.java</code></td>
+    <td rowspan="3">覆盖 <code>isFail()</code>，<code>isClientAbort</code> 返回 true → 不记 ERROR</td>
+    <td>前序会话</td>
+  </tr>
+  <tr><td>ProxyResourceProfile</td><td><code>proxy/aop/ProxyResourceProfile.java</code>（新建）</td><td>前序会话</td></tr>
+  <tr><td>FsiResourceProfile</td><td><code>proxy/adapter/aop/FsiResourceProfile.java</code></td><td>前序会话</td></tr>
+  <tr>
+    <td rowspan="4" class="g"><strong>Service 层</strong><br>堵 AOP 兜不住的漏</td>
+    <td>saveFile 日志参数</td>
+    <td><code>NFileServiceImpl.java:162</code></td>
+    <td>补回 request 上下文，异常已抛出可被 AOP 兜</td>
+    <td>本次</td>
+  </tr>
+  <tr>
+    <td>makeWater 空数据 <span class="tag tag-p0">P0</span></td>
+    <td><code>NFileServiceImpl.java:779</code></td>
+    <td>catch 后抛 IO_EXCEPTION + 空流判空，不再用 <code>new byte[0]</code> 做水印</td>
+    <td>本次</td>
+  </tr>
+  <tr>
+    <td>uploadAvatar EOF 降级</td>
+    <td><code>NFileServiceImpl.java:899</code></td>
+    <td>catch IOException 区分 EOF（<code>isClientAbort</code> 降 WARN）和真实 IO（保留 ERROR）</td>
+    <td>本次</td>
+  </tr>
+  <tr>
+    <td>新增 <code>isClientAbort()</code></td>
+    <td><code>NFileServiceImpl.java</code></td>
+    <td>私有方法，复用 AOP 同款 EOF 判定（遍历 cause 链 10 层）</td>
+    <td>本次</td>
+  </tr>
+</table>
+
+<h3>AOP 切点覆盖范围</h3>
+<table>
+  <tr><th>AOP 类</th><th>切点表达式</th><th>覆盖的接口类</th></tr>
+  <tr>
+    <td>FileResourceProfile</td>
+    <td><code>execution(* ...fileserver.resource.*.*(..))</code></td>
+    <td>NFileResource / AbstractFileResource / AFileResource / DefaultFileResource</td>
+  </tr>
+  <tr>
+    <td>ProxyResourceProfile</td>
+    <td><code>execution(* ...proxy.resource.*.*(..))</code></td>
+    <td>ProxyResource / NProxyResource / AProxyResource</td>
+  </tr>
+  <tr>
+    <td>FsiResourceProfile</td>
+    <td><code>execution(* ...proxy.adapter.resource.*.*(..))</code></td>
+    <td>NFileStorageAdapter / EnterpriseStorageAdaptor / XTCompatibleAdapter</td>
+  </tr>
+</table>
+
+<div class="warn-box">
+  ⚠️ <strong>覆盖关系关键点</strong>：AOP 切的是 Resource 层，只对<strong>抛出到 Resource 层的异常</strong>有效。Service 层 catch 后吞掉的异常（makeWater 原来吞掉继续执行、uploadAvatar 原来 return）到不了 AOP，必须改业务代码堵漏——这正是本轮 Service 层 3 处改动的作用。
+</div>
+
+<h3>EOF 判定逻辑（isClientAbort）</h3>
+<p>识别 5 种客户端断连特征，遍历异常 cause 链最多 10 层：</p>
+<ul>
+  <li><code>ClientAbortException</code> — 类名包含</li>
+  <li><code>java.io.EOFException</code> — 类名等值</li>
+  <li><code>Unexpected EOF read on the socket</code> — message 包含</li>
+  <li><code>Broken pipe</code> — message 包含</li>
+  <li><code>Connection reset by peer</code> — message 包含</li>
+</ul>
+
+<!-- WARN 统计口径 -->
+<h2>五、WARN 日志统计口径</h2>
+
+<div class="card">
+  <p><strong>logback.xml 配置</strong>：root level=info → ASYNC → RollingFile，业务类无单独 logger 覆盖。<code>log.warn(...)</code> 正常落盘，logger 名 = 类全限定名（<code>@Slf4j</code> 默认）。</p>
+</div>
+
+<h3>可直接按 logger 统计的 WARN（Service 层显式，本次新增）</h3>
+<table>
+  <tr><th>logger</th><th>行</th><th>WARN 文案</th><th>触发场景</th></tr>
+  <tr>
+    <td rowspan="2" class="mono" style="vertical-align:top"><code>com.facishare.stone.fileserver.<br>service.impl.NFileServiceImpl</code></td>
+    <td>783</td>
+    <td><code>empty stream for watermark,request:{}</code></td>
+    <td>makeWater 读到空流</td>
+  </tr>
+  <tr>
+    <td>900</td>
+    <td><code>uploadAvatar client aborted,request:{}</code></td>
+    <td>uploadAvatar 客户端断连</td>
+  </tr>
+</table>
+
+<h3>建议统计查询</h3>
+<pre style="background:#21262d;padding:14px;border-radius:6px;overflow-x:auto;font-size:.82rem;color:var(--green);line-height:1.5">
+logger = com.facishare.stone.fileserver.service.impl.NFileServiceImpl
+  AND level = WARN
+  AND (msg LIKE 'empty stream for watermark%' OR msg LIKE 'uploadAvatar client aborted%')
+</pre>
+<p class="meta">AOP 层降级的 WARN（~5万条 ClientAbort）走 rpc-trace 框架上报，不在本地 RollingFile 里。建议用 <code>log_error_dist</code> 中 ClientAbort <strong>ERROR 量下降</strong>做反向印证。</p>
+
+<!-- 验证证据 -->
+<h2>六、验证证据</h2>
+
+<div class="timeline">
+  <div class="tl-item done">
+    <strong>makeWater / uploadAvatar 代码修改</strong>
+    <div class="meta">NFileServiceImpl.java · +33 -4 行 · 2026-06-25</div>
+    <div class="mono">git diff --stat → 1 file changed, 33 insertions(+), 4 deletions(-)</div>
+  </div>
+  <div class="tl-item done">
+    <strong>编译验证</strong>
+    <div class="meta">fileserver 模块离线编译</div>
+    <div class="mono">mvn -pl fs-stone-fileserver compile -DskipTests -o → BUILD SUCCESS</div>
+  </div>
+  <div class="tl-item done">
+    <strong>单测验证</strong>
+    <div class="meta">NFileServiceImplTest + FileResourceProfileTest</div>
+    <div class="mono">mvn -pl fs-stone-fileserver -Dtest=NFileServiceImplTest,FileResourceProfileTest test -o → Tests run: 5, Failures: 0, Errors: 0</div>
+  </div>
+  <div class="tl-item done">
+    <strong>git diff --check</strong>
+    <div class="meta">无空白错误</div>
+    <div class="mono">git diff --check → CHECK_OK</div>
+  </div>
+  <div class="tl-item progress">
+    <strong>线上基线刷新（受阻）</strong>
+    <div class="meta">fx-ops CLI error-log 直查入口返回 sql_query.invalid_request</div>
+    <div class="meta">基线沿用 06-16 报告，上线验收需改用蜂眼平台/有权限 ClickHouse 入口</div>
+  </div>
+</div>
+
+<!-- 预期收益 -->
+<h2>七、预期收益量化</h2>
+
+<table>
+  <tr><th>阶段</th><th>修复项</th><th>预计减少 ERROR/7天</th><th>三服务剩余总量</th></tr>
+  <tr><td>Phase 0</td><td>水印空数据 + 日志参数</td><td>~500（修数据安全为主）</td><td>~22.6 万</td></tr>
+  <tr><td>Phase 1</td><td>ClientAbort 降级 + proxy token 空日志定位分级 + 配置清零</td><td class="g"><strong>~13.5 万</strong></td><td><strong>~9 万</strong></td></tr>
+  <tr><td>Phase 2</td><td>proxy 越界 + metaserver 缓存容错 + fileserver NPE</td><td><strong>~5 万</strong></td><td><strong>~4 万</strong></td></tr>
+  <tr><td>Phase 3</td><td>规范 + 告警 + 周报</td><td>持续收敛</td><td><strong>&lt; 3 万</strong></td></tr>
+</table>
+
+<!-- 未完成与风险 -->
+<h2>八、未完成事项与风险</h2>
+
+<div class="warn-box">
+  <p><strong>待处理</strong></p>
+  <ul style="margin-top:6px">
+    <li><strong>proxy token='' 定位</strong>（~10.7 万条，占 proxy 98.8%）：本期单点最大降噪目标，需蜂眼平台按 loggerName 聚合 Top 20 定位打印点</li>
+    <li><strong>AOP 改动 + Service 修复未提交上线</strong>：代码在工作区，需走发布流程</li>
+    <li><strong>makeWater/uploadAvatar EOF 分支未补单测</strong>：现有 NFileServiceImplTest 只覆盖 buildOriginImageData</li>
+    <li><strong>线上基线无法实时刷新</strong>：fx-ops CLI 直查入口不可用，验收依赖蜂眼平台</li>
+  </ul>
+</div>
+
+<table>
+  <tr><th>风险</th><th>影响</th><th>应对</th></tr>
+  <tr><td>水印接口抛异常后返回错误码，影响上游兼容性</td><td>中</td><td>保持 HTTP 状态码不变，错误码与现有 IO_EXCEPTION 对齐</td></tr>
+  <tr><td>客户端中断降级后，真实网络问题被忽略</td><td>中</td><td>保留 WARN 并设 WARN 阈值告警</td></tr>
+  <tr><td>NPE 判空后返回错误码，影响上游兼容性</td><td>中</td><td>保持 HTTP 状态码和错误码不变</td></tr>
+  <tr><td>proxy token 空日志降级后掩盖真实故障</td><td>中</td><td>定位阶段先分类，只降级客户端中断/业务可预期异常</td></tr>
+</table>
+
+<!-- 落地文件 -->
+<h2>九、落地文件清单</h2>
+
+<table>
+  <tr><th>文件</th><th>说明</th></tr>
+  <tr><td class="mono">docs/specs/error-log-governance.md</td><td>治理 spec（范围收敛到三服务）</td></tr>
+  <tr><td class="mono">docs/exec-plans/active/2026-06-16-error-log-governance.md</td><td>active plan v3.0（含任务表、验收标准、Handoff）</td></tr>
+  <tr><td class="mono">PLANS.md</td><td>Active Work 摘要同步</td></tr>
+  <tr><td class="mono">docs/specs/index.md</td><td>spec 索引同步</td></tr>
+  <tr><td class="mono">output/evidence/20260625-error-log-baseline-fs-stone/00-baseline-refresh-attempt.md</td><td>基线刷新失败证据</td></tr>
+  <tr><td class="mono">fs-stone-fileserver/.../NFileServiceImpl.java</td><td>Service 层 EOF 治理代码（本次改动）</td></tr>
+  <tr><td class="mono">fs-stone-fileserver/.../aop/FileResourceProfile.java</td><td>AOP EOF 降级（前序会话）</td></tr>
+  <tr><td class="mono">fs-stone-proxy/.../aop/ProxyResourceProfile.java</td><td>AOP EOF 降级（前序会话，新建未追踪）</td></tr>
+  <tr><td class="mono">fs-stone-proxy/.../adapter/aop/FsiResourceProfile.java</td><td>AOP EOF 降级（前序会话）</td></tr>
+  <tr><td class="mono">fs-stone-proxy/src/main/resources/spring/spring-aop.xml</td><td>AOP 装配（前序会话）</td></tr>
+</table>
+
+<!-- 下一步 -->
+<h2>十、下一步行动</h2>
+
+<div class="timeline">
+  <div class="tl-item progress">
+    <strong>1. 推动已有 AOP + Service 修复提交上线</strong>
+    <div class="meta">git 工作区已有全部 EOF 治理改动，提交后走发布流程</div>
+  </div>
+  <div class="tl-item">
+    <strong>2. 上线后验证 fileserver ClientAbortException 清零</strong>
+    <div class="meta">蜂眼平台查 <code>app='fs-stone-fileserver' AND token='ClientAbortException'</code>，对照基线 50,257 应大幅下降</div>
+  </div>
+  <div class="tl-item">
+    <strong>3. 定位 proxy token='' 日志来源</strong>
+    <div class="meta">蜂眼平台按 <code>app='fs-stone-proxy' AND token=''</code> 取 loggerName/msg 聚合 Top 20</div>
+  </div>
+  <div class="tl-item">
+    <strong>4. 补 makeWater/uploadAvatar EOF 分支单测</strong>
+    <div class="meta">需 mock 整条下载链路，已记入 plan follow-up</div>
+  </div>
+  <div class="tl-item">
+    <strong>5. 启动 Phase 2 根因修复</strong>
+    <div class="meta">proxy AvatarService 越界 → metaserver 缓存 JSON 容错 → fileserver 链路 NPE</div>
+  </div>
+</div>
+
+<div class="footer">
+  fs-stone 错误日志治理 · 2026-06-25 · 分支 910-fix · 基线来源 output/fs-stone-error-log-analysis-7d.md
+</div>
+
+</body>
+</html>
