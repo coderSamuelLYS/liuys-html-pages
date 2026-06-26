@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSS → COS 迁移方案评审</title>
+<style>
+  :root{
+    --bg-1:#EAF3FE; --bg-2:#F4F9FF; --bg-3:#DCE9FB;
+    --glass:rgba(255,255,255,0.55);
+    --glass-strong:rgba(255,255,255,0.74);
+    --glass-border:rgba(255,255,255,0.88);
+    --primary:#2E86DE; --primary-deep:#1B6FCC;
+    --primary-light:#74B9FF; --accent:#6C5CE7; --teal:#0FBCF9;
+    --text:#16263A; --text-sub:#52677E; --text-mute:#8195A8;
+    --line:rgba(46,134,222,0.14);
+    --oss:#FF6B6B; --oss-bg:rgba(255,107,107,.12);
+    --cos:#18C29C; --cos-bg:rgba(24,194,156,.12);
+    --net:#6C5CE7; --net-bg:rgba(108,92,231,.12);
+    --warn:#FE9A3D; --warn-bg:rgba(254,154,61,.14);
+    --shadow:0 12px 38px rgba(46,134,222,0.16);
+    --shadow-soft:0 6px 20px rgba(46,134,222,0.10);
+    --radius:20px;
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-2);line-height:1.78;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .blobs{position:fixed;inset:0;z-index:-2;overflow:hidden}
+  .blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;animation:float 20s ease-in-out infinite}
+  .blob.b1{width:560px;height:560px;background:radial-gradient(circle,#9DD0FF,transparent 70%);top:-140px;left:-100px}
+  .blob.b2{width:640px;height:640px;background:radial-gradient(circle,#C4B5FD,transparent 70%);bottom:-200px;right:-140px;animation-delay:-7s}
+  .blob.b3{width:440px;height:440px;background:radial-gradient(circle,#A8E6FF,transparent 70%);top:42%;left:52%;animation-delay:-13s}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(34px,-34px) scale(1.08)}}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(160deg,var(--bg-2),var(--bg-1) 42%,var(--bg-3));opacity:.9}
+
+  header.nav{position:fixed;top:0;left:0;right:0;z-index:100;backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);background:rgba(255,255,255,0.52);border-bottom:1px solid var(--glass-border);box-shadow:0 2px 18px rgba(46,134,222,0.08)}
+  .nav-inner{max-width:1320px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:16px}
+  .brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;box-shadow:0 4px 14px rgba(108,92,231,.4)}
+  .brand small{display:block;font-weight:500;font-size:11.5px;color:var(--text-mute)}
+  .nav-links{display:flex;gap:4px;flex-wrap:wrap}
+  .nav-links a{padding:7px 12px;border-radius:10px;font-size:13px;color:var(--text-sub);text-decoration:none;transition:.25s;white-space:nowrap}
+  .nav-links a:hover{background:rgba(46,134,222,.1);color:var(--primary-deep)}
+  .menu-btn{display:none;background:none;border:none;font-size:22px;color:var(--primary);cursor:pointer}
+
+  .wrap{max-width:1320px;margin:0 auto;padding:92px 28px 80px}
+  .card{background:var(--glass);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow-soft);padding:30px 32px;margin-bottom:26px;transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;transform-style:preserve-3d}
+  .card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+  .card h2{display:flex;align-items:center;gap:12px;font-size:22px;margin-bottom:4px;letter-spacing:-.01em}
+  .sec-no{flex:0 0 auto;width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;box-shadow:0 3px 10px rgba(46,134,222,.35)}
+  .card .sub{color:var(--text-mute);font-size:13.5px;margin-bottom:20px;margin-left:44px}
+  .card h3{font-size:16px;margin:22px 0 12px;color:var(--primary-deep);display:flex;align-items:center;gap:9px}
+  .card h3::before{content:"";width:5px;height:16px;border-radius:3px;background:linear-gradient(var(--primary),var(--accent))}
+  .card p{color:var(--text-sub);margin-bottom:10px;font-size:14.5px}
+  .card strong{color:var(--text);font-weight:600}
+
+  .hero{text-align:center;padding:46px 28px 38px;background:var(--glass-strong)}
+  .hero .tag{display:inline-block;padding:6px 16px;border-radius:30px;background:rgba(46,134,222,.12);color:var(--primary-deep);font-size:12.5px;font-weight:600;letter-spacing:.05em;margin-bottom:18px}
+  .hero h1{font-size:34px;line-height:1.25;letter-spacing:-.02em;background:linear-gradient(120deg,var(--primary-deep),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:14px}
+  .hero p{color:var(--text-sub);font-size:15px;max-width:680px;margin:0 auto}
+
+  /* 通用图容器 */
+  .fig{background:rgba(255,255,255,.45);border:1px solid var(--glass-border);border-radius:16px;padding:22px;margin:14px 0}
+  .fig svg{display:block;width:100%;height:auto;max-width:780px;margin:0 auto}
+  .fig .cap{text-align:center;font-size:12.5px;color:var(--text-mute);margin-top:12px;font-style:italic}
+
+  /* 范围矩阵 */
+  .scope-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .scope{border-radius:16px;padding:18px 20px;border:1px solid var(--glass-border);background:rgba(255,255,255,.5);transition:.3s;display:flex;align-items:flex-start;gap:14px}
+  .scope:hover{transform:translateY(-3px);box-shadow:var(--shadow-soft)}
+  .scope .ic{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px}
+  .scope.migrate .ic{background:var(--cos-bg);color:var(--cos)}
+  .scope.keep .ic{background:var(--oss-bg);color:var(--oss)}
+  .scope.skip .ic{background:var(--net-bg);color:var(--net)}
+  .scope b{font-size:15px;display:block;margin-bottom:3px}
+  .scope span{font-size:13px;color:var(--text-sub)}
+  .tag-sm{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11.5px;font-weight:600;margin-top:6px}
+  .tag-sm.cos{background:var(--cos-bg);color:var(--cos)}
+  .tag-sm.oss{background:var(--oss-bg);color:var(--oss)}
+  .tag-sm.net{background:var(--net-bg);color:var(--net)}
+
+  /* 前提卡 */
+  .premises{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .premise{background:rgba(255,255,255,.5);border:1px solid var(--glass-border);border-radius:14px;padding:18px;transition:.3s;position:relative;overflow:hidden}
+  .premise:hover{transform:translateY(-3px);box-shadow:var(--shadow-soft)}
+  .premise .pn{position:absolute;top:-6px;right:10px;font-size:42px;font-weight:800;color:rgba(46,134,222,.1)}
+  .premise b{font-size:14.5px;display:block;margin-bottom:5px;position:relative}
+  .premise p{font-size:13px;color:var(--text-sub);margin:0;position:relative}
+
+  /* 判据指标 */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .metric{background:rgba(255,255,255,.5);border:1px solid var(--glass-border);border-radius:14px;padding:16px 14px;text-align:center;transition:.3s}
+  .metric:hover{transform:translateY(-3px);box-shadow:var(--shadow-soft)}
+  .metric .v{font-size:24px;font-weight:800;background:linear-gradient(120deg,var(--primary),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.1}
+  .metric .k{font-size:12px;color:var(--text-sub);margin-top:6px}
+
+  /* 风险/稳态列表 */
+  ul.clean{list-style:none;display:flex;flex-direction:column;gap:10px}
+  ul.clean li{position:relative;padding-left:22px;font-size:14px;color:var(--text-sub)}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:11px;width:7px;height:7px;border-radius:50%;background:linear-gradient(var(--primary),var(--accent));box-shadow:0 0 0 3px rgba(46,134,222,.12)}
+  ul.clean li b{color:var(--text)}
+
+  /* 警示框 */
+  .callout{border-radius:14px;padding:16px 18px;margin-top:14px;display:flex;gap:12px;align-items:flex-start}
+  .callout.warn{background:linear-gradient(135deg,var(--warn-bg),rgba(255,255,255,.4));border:1px solid rgba(254,154,61,.32)}
+  .callout.key{background:linear-gradient(135deg,rgba(46,134,222,.12),rgba(255,255,255,.4));border:1px solid rgba(46,134,222,.25)}
+  .callout .ico{font-size:18px;flex:0 0 auto}
+  .callout p{margin:0;font-size:13.5px;color:var(--text-sub)}
+  .callout p b{color:var(--text)}
+
+  @media(max-width:780px){
+    .wrap{padding:84px 16px 60px}
+    .nav-inner{padding:12px 16px}
+    .nav-links{display:none}
+    .nav-links.open{display:flex;position:absolute;top:100%;left:0;right:0;flex-direction:column;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);padding:12px;border-bottom:1px solid var(--glass-border)}
+    .menu-btn{display:block}
+    .card{padding:22px 18px}
+    .hero h1{font-size:25px}
+    .scope-grid,.premises{grid-template-columns:1fr}
+    .metrics{grid-template-columns:repeat(2,1fr)}
+  }
+  .tilt{transition:transform .2s ease-out}
+</style>
+</head>
+<body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+
+<header class="nav">
+  <div class="nav-inner">
+    <div class="brand"><div class="logo">⇄</div><div>迁移方案评审<small>OSS → 腾讯云 COS</small></div></div>
+    <nav class="nav-links" id="navLinks">
+      <a href="#scope">迁移范围</a>
+      <a href="#arch">核心架构</a>
+      <a href="#model">路由模型</a>
+      <a href="#path">执行路径</a>
+      <a href="#rhythm">灰度节奏</a>
+      <a href="#rollback">回退机制</a>
+      <a href="#nodata">不可逆点</a>
+      <a href="#gate">晋级判据</a>
+    </nav>
+    <button class="menu-btn" id="menuBtn">☰</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card hero">
+    <span class="tag">方案评审 · 设计逻辑视角</span>
+    <h1>大文件存储 OSS → COS 迁移方案</h1>
+    <p>历史对象由 CDM 跨云搬运（copy 语义、源数据保留），本服务只做存储路由切换与对账。按企业分批灰度，切前/切后补迁兜底所有窗口期。本评审聚焦方案的<b>前提依赖、机制对称性与风险边界</b>。</p>
+  </div>
+
+  <!-- 一、迁移范围 -->
+  <section class="card" id="scope">
+    <h2><span class="sec-no">1</span>迁移范围与边界</h2>
+    <p class="sub">不是所有大文件都迁。三类对象各有归宿，只有"非网盘、非数据专属"参与默认迁移。</p>
+    <div class="scope-grid">
+      <div class="scope migrate"><div class="ic">→</div><div><b>非网盘 · 非专属</b><span>默认存储迁移对象，迁到 COS</span><span class="tag-sm cos">迁移 COS</span></div></div>
+      <div class="scope keep"><div class="ic">⊘</div><div><b>网盘业务</b><span>前端不支持，继续走 OSS，不迁移</span><span class="tag-sm oss">保留 OSS</span></div></div>
+      <div class="scope skip"><div class="ic">◇</div><div><b>数据专属 / 专属存储企业</b><span>由显式存储类型配置控制，不参与默认迁移</span><span class="tag-sm net">显式配置</span></div></div>
+      <div class="scope keep"><div class="ic">↻</div><div><b>上传过程不中断</b><span>切换瞬间落旧存储的对象，靠补迁兜底</span><span class="tag-sm oss">容忍短暂真空</span></div></div>
+    </div>
+  </section>
+
+  <!-- 二、核心架构 -->
+  <section class="card" id="arch">
+    <h2><span class="sec-no">2</span>核心架构：职责分工</h2>
+    <p class="sub">跨云搬运与存储路由彻底解耦。CDM 负责把对象从 OSS 复制到 COS，本服务只决定"读写时路由到哪边"并做对账。</p>
+    <div class="fig">
+      <svg viewBox="0 0 780 320" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gOss" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8787"/><stop offset="1" stop-color="#E8553A"/></linearGradient>
+          <linearGradient id="gCos" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3DDC97"/><stop offset="1" stop-color="#129F7E"/></linearGradient>
+          <linearGradient id="gBfm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#74B9FF"/><stop offset="1" stop-color="#1B6FCC"/></linearGradient>
+          <linearGradient id="gCdm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A29BFE"/><stop offset="1" stop-color="#6C5CE7"/></linearGradient>
+          <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#6C5CE7"/></marker>
+          <marker id="arrB" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2E86DE"/></marker>
+        </defs>
+        <!-- OSS -->
+        <rect x="40" y="60" width="180" height="90" rx="16" fill="url(#gOss)" opacity="0.92"/>
+        <text x="130" y="100" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">阿里云 OSS</text>
+        <text x="130" y="124" text-anchor="middle" fill="#fff" font-size="12.5" opacity="0.9">源存储 · 网盘长期保留</text>
+        <!-- COS -->
+        <rect x="560" y="60" width="180" height="90" rx="16" fill="url(#gCos)" opacity="0.92"/>
+        <text x="650" y="100" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">腾讯云 COS</text>
+        <text x="650" y="124" text-anchor="middle" fill="#fff" font-size="12.5" opacity="0.9">目标存储 · 默认存储</text>
+        <!-- CDM -->
+        <rect x="290" y="200" width="200" height="80" rx="16" fill="url(#gCdm)" opacity="0.92"/>
+        <text x="390" y="232" text-anchor="middle" fill="#fff" font-size="17" font-weight="700">CDM 跨云搬运</text>
+        <text x="390" y="254" text-anchor="middle" fill="#fff" font-size="11.5" opacity="0.9">copy 语义 · 源数据保留</text>
+        <!-- BFM -->
+        <rect x="290" y="30" width="200" height="60" rx="16" fill="url(#gBfm)" opacity="0.92"/>
+        <text x="390" y="58" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">本服务 BFM</text>
+        <text x="390" y="76" text-anchor="middle" fill="#fff" font-size="11" opacity="0.9">存储路由 + 对账</text>
+        <!-- CDM arrows: copy from OSS to COS -->
+        <path d="M 220 105 Q 390 150 560 105" fill="none" stroke="#6C5CE7" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+        <text x="392" y="172" text-anchor="middle" fill="#6C5CE7" font-size="12" font-weight="600">copy 历史对象</text>
+        <!-- BFM arrows: route to both -->
+        <path d="M 290 55 Q 230 45 220 75" fill="none" stroke="#2E86DE" stroke-width="2" marker-end="url(#arrB)"/>
+        <path d="M 490 55 Q 560 45 560 75" fill="none" stroke="#2E86DE" stroke-width="2" marker-end="url(#arrB)"/>
+        <text x="200" y="40" fill="#2E86DE" font-size="11.5" font-weight="600">路由读写</text>
+        <text x="558" y="40" fill="#2E86DE" font-size="11.5" font-weight="600">路由读写</text>
+      </svg>
+      <div class="cap">CDM 把对象从 OSS 复制到 COS（保留源）；本服务按企业存储类型决定读写路由到哪一边</div>
+    </div>
+    <div class="callout key">
+      <div class="ico">🔑</div>
+      <p><b>关键设计：</b>本服务不实现跨云搬运。这把"70TB 怎么搬"和"什么时候切路由"两件事彻底分离——搬运的快慢不影响业务，路由切换是秒级生效。</p>
+    </div>
+  </section>
+
+  <!-- 三、迁移前提 -->
+  <section class="card" id="premise">
+    <h2><span class="sec-no">3</span>四条迁移前提（均已确认）</h2>
+    <p class="sub">整套方案成立依赖这四条。任一不成立，对应机制需要重新设计。</p>
+    <div class="premises">
+      <div class="premise"><span class="pn">01</span><b>对象标识迁移前后不变</b><p>CDM 保持原对象标识，不加额外目录。同一标识在 OSS 与 COS 指同一对象——这是"路由无关位置"的前提。</p></div>
+      <div class="premise"><span class="pn">02</span><b>CDM 是 copy 不是 move</b><p>迁移完成后对象在 OSS 和 COS 两边共存，源数据保留。这是"回退只需补增量"的前提。</p></div>
+      <div class="premise"><span class="pn">03</span><b>对象标识一次性写入不覆盖</b><p>CDM"同名已存在则跳过"策略在此前提下幂等安全。补迁重复跑不会拿到旧内容。</p></div>
+      <div class="premise"><span class="pn">04</span><b>对象标识含企业信息</b><p>CDM 可按企业对象标识规则精确匹配本批迁移范围，"批次"在搬运侧可识别。</p></div>
+    </div>
+  </section>
+
+  <!-- 四、路由模型 -->
+  <section class="card" id="model">
+    <h2><span class="sec-no">4</span>双副本共存 · 路由模型</h2>
+    <p class="sub">这是整个方案最核心的设计，理解它就能理解为什么所有窗口期都不致命。</p>
+    <div class="fig">
+      <svg viewBox="0 0 780 280" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="mOss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF8787"/><stop offset="1" stop-color="#E8553A"/></linearGradient>
+          <linearGradient id="mCos" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3DDC97"/><stop offset="1" stop-color="#129F7E"/></linearGradient>
+          <linearGradient id="mRoute" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#74B9FF"/><stop offset="1" stop-color="#6C5CE7"/></linearGradient>
+        </defs>
+        <!-- 路由层 -->
+        <rect x="190" y="20" width="400" height="56" rx="14" fill="url(#mRoute)" opacity="0.95"/>
+        <text x="390" y="46" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">路由层：按企业当前存储类型决定</text>
+        <text x="390" y="65" text-anchor="middle" fill="#fff" font-size="11.5" opacity="0.92">不逐对象判断 · 无需逐对象真值字段</text>
+        <!-- 两个副本 -->
+        <rect x="90" y="140" width="200" height="110" rx="16" fill="url(#mOss)" opacity="0.9"/>
+        <text x="190" y="178" text-anchor="middle" fill="#fff" font-size="17" font-weight="700">OSS 副本</text>
+        <text x="190" y="202" text-anchor="middle" fill="#fff" font-size="12" opacity="0.92">原始对象</text>
+        <text x="190" y="224" text-anchor="middle" fill="#fff" font-size="12" opacity="0.92">迁移后仍保留</text>
+        <rect x="490" y="140" width="200" height="110" rx="16" fill="url(#mCos)" opacity="0.9"/>
+        <text x="590" y="178" text-anchor="middle" fill="#fff" font-size="17" font-weight="700">COS 副本</text>
+        <text x="590" y="202" text-anchor="middle" fill="#fff" font-size="12" opacity="0.92">CDM 复制而来</text>
+        <text x="590" y="224" text-anchor="middle" fill="#fff" font-size="12" opacity="0.92">与 OSS 同标识同内容</text>
+        <!-- 连线 -->
+        <line x1="290" y1="180" x2="490" y2="180" stroke="#6C5CE7" stroke-width="2" stroke-dasharray="5 4"/>
+        <text x="390" y="172" text-anchor="middle" fill="#6C5CE7" font-size="11.5" font-weight="600">同一对象 · 两边都有</text>
+        <!-- 路由下行 -->
+        <path d="M 300 76 L 200 140" fill="none" stroke="#2E86DE" stroke-width="2" opacity="0.5"/>
+        <path d="M 480 76 L 580 140" fill="none" stroke="#2E86DE" stroke-width="2" opacity="0.5"/>
+      </svg>
+      <div class="cap">对象两边都在 → 路由到 OSS 或 COS 都能读到 → 不需要记录"每个对象实际在哪"</div>
+    </div>
+    <div class="callout key">
+      <div class="ico">💡</div>
+      <p><b>由此推出：</b>正向切流、回退、多实例配置时间差，产生的"落旧存储、尚未复制到新存储的对象"，本质都是同一类问题，统一由<b>切后补迁</b>扫掉。方案不需要为每种窗口期设计不同机制。</p>
+    </div>
+  </section>
+
+  <!-- 五、执行路径 -->
+  <section class="card" id="path">
+    <h2><span class="sec-no">5</span>三阶段执行路径</h2>
+    <p class="sub">先搬大头，再按企业灰度，最后切全局默认。每个阶段都可暂停、可回退。</p>
+    <div class="fig">
+      <svg viewBox="0 0 780 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="p1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#74B9FF"/><stop offset="1" stop-color="#2E86DE"/></linearGradient>
+          <linearGradient id="p2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2E86DE"/><stop offset="1" stop-color="#6C5CE7"/></linearGradient>
+          <linearGradient id="p3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6C5CE7"/><stop offset="1" stop-color="#18C29C"/></linearGradient>
+        </defs>
+        <!-- 时间轴 -->
+        <line x1="60" y1="120" x2="720" y2="120" stroke="#C9D8EC" stroke-width="3" stroke-linecap="round"/>
+        <!-- 阶段1 -->
+        <circle cx="140" cy="120" r="20" fill="url(#p1)"/>
+        <text x="140" y="126" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">1</text>
+        <rect x="50" y="150" width="200" height="70" rx="12" fill="rgba(46,134,222,.1)" stroke="rgba(46,134,222,.25)"/>
+        <text x="150" y="176" text-anchor="middle" fill="#1B6FCC" font-size="14.5" font-weight="700">全局全量迁移</text>
+        <text x="150" y="196" text-anchor="middle" fill="#52677E" font-size="12">70T 历史对象大头先搬</text>
+        <text x="150" y="212" text-anchor="middle" fill="#8195A8" font-size="11">CDM 跳过已存在，可重跑</text>
+        <!-- 阶段2 -->
+        <circle cx="390" cy="120" r="20" fill="url(#p2)"/>
+        <text x="390" y="126" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">2</text>
+        <rect x="290" y="20" width="200" height="70" rx="12" fill="rgba(108,92,231,.1)" stroke="rgba(108,92,231,.25)"/>
+        <text x="390" y="46" text-anchor="middle" fill="#5A4BC0" font-size="14.5" font-weight="700">按企业批次灰度</text>
+        <text x="390" y="66" text-anchor="middle" fill="#52677E" font-size="12">切前补迁 → 改名单 → 切后补迁</text>
+        <text x="390" y="82" text-anchor="middle" fill="#8195A8" font-size="11">每批可独立验证、可回退</text>
+        <!-- 阶段3 -->
+        <circle cx="640" cy="120" r="20" fill="url(#p3)"/>
+        <text x="640" y="126" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">3</text>
+        <rect x="540" y="150" width="200" height="70" rx="12" fill="rgba(24,194,156,.1)" stroke="rgba(24,194,156,.28)"/>
+        <text x="640" y="176" text-anchor="middle" fill="#129F7E" font-size="14.5" font-weight="700">全局切换</text>
+        <text x="640" y="196" text-anchor="middle" fill="#52677E" font-size="12">默认存储改为 COS</text>
+        <text x="640" y="212" text-anchor="middle" fill="#8195A8" font-size="11">清空灰度名单，低峰执行</text>
+      </svg>
+      <div class="cap">阶段 2 是核心风险区，分 4 批逐步放量：内测 → 小流量 → 中流量 → 全量</div>
+    </div>
+  </section>
+
+  <!-- 六、灰度节奏 -->
+  <section class="card" id="rhythm">
+    <h2><span class="sec-no">6</span>单批灰度节奏</h2>
+    <p class="sub">每批企业执行的三步闭环。切前/切后两次补迁夹住切换瞬间，覆盖所有边缘对象。</p>
+    <div class="fig">
+      <svg viewBox="0 0 780 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ra" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2E86DE"/></marker>
+        </defs>
+        <!-- 轨道线 -->
+        <line x1="40" y1="150" x2="740" y2="150" stroke="#D5E3F5" stroke-width="2" stroke-dasharray="4 4"/>
+        <!-- 切前补迁 -->
+        <rect x="40" y="60" width="200" height="90" rx="14" fill="rgba(46,134,222,.1)" stroke="rgba(46,134,222,.28)"/>
+        <text x="140" y="88" text-anchor="middle" fill="#1B6FCC" font-size="13" font-weight="700">① 切前补迁</text>
+        <text x="140" y="110" text-anchor="middle" fill="#52677E" font-size="11.5">触发 CDM 迁移 + 对账</text>
+        <text x="140" y="128" text-anchor="middle" fill="#8195A8" font-size="11">补全量后→灰度前的新增</text>
+        <!-- 改名单 -->
+        <rect x="290" y="60" width="200" height="90" rx="14" fill="rgba(108,92,231,.12)" stroke="rgba(108,92,231,.3)"/>
+        <text x="390" y="88" text-anchor="middle" fill="#5A4BC0" font-size="13" font-weight="700">② 加入灰度名单</text>
+        <text x="390" y="110" text-anchor="middle" fill="#52677E" font-size="11.5">新读写开始走 COS</text>
+        <text x="390" y="128" text-anchor="middle" fill="#8195A8" font-size="11">切换瞬间生效</text>
+        <!-- 切后补迁 -->
+        <rect x="540" y="60" width="200" height="90" rx="14" fill="rgba(24,194,156,.1)" stroke="rgba(24,194,156,.3)"/>
+        <text x="640" y="88" text-anchor="middle" fill="#129F7E" font-size="13" font-weight="700">③ 切后立刻补迁</text>
+        <text x="640" y="110" text-anchor="middle" fill="#52677E" font-size="11.5">再次触发 CDM + 对账</text>
+        <text x="640" y="128" text-anchor="middle" fill="#8195A8" font-size="11">扫切换瞬间 + 时间差对象</text>
+        <!-- 箭头 -->
+        <path d="M 240 105 L 290 105" fill="none" stroke="#2E86DE" stroke-width="2" marker-end="url(#ra)"/>
+        <path d="M 490 105 L 540 105" fill="none" stroke="#2E86DE" stroke-width="2" marker-end="url(#ra)"/>
+        <!-- 时间差说明 -->
+        <rect x="120" y="200" width="540" height="70" rx="12" fill="rgba(255,255,255,.5)" stroke="rgba(46,134,222,.18)"/>
+        <text x="390" y="226" text-anchor="middle" fill="#1B6FCC" font-size="12.5" font-weight="700">多实例配置热更新时间差</text>
+        <text x="390" y="248" text-anchor="middle" fill="#52677E" font-size="12">不同实例收到名单更新的时间不同，同一企业短时间内可能落到不同存储</text>
+        <text x="390" y="266" text-anchor="middle" fill="#8195A8" font-size="11.5">→ 这些"落旧存储"的对象，统一被 ③ 切后补迁扫掉，无需单独处理</text>
+        <path d="M 640 150 L 640 200" fill="none" stroke="#18C29C" stroke-width="2" stroke-dasharray="3 3"/>
+      </svg>
+      <div class="cap">两次补迁夹住切换点，所有窗口期（切换瞬间 + 实例时间差）统一收敛到"切后补迁"</div>
+    </div>
+  </section>
+
+  <!-- 七、回退机制 -->
+  <section class="card" id="rollback">
+    <h2><span class="sec-no">7</span>回退机制：正向与反向对称</h2>
+    <p class="sub">回退不是"改个配置就回去"。正向和回退都依赖"两边共存 + 补迁兜底"，机制完全对称。</p>
+    <div class="fig">
+      <svg viewBox="0 0 780 360" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="farr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2E86DE"/></marker>
+          <marker id="barr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#E8553A"/></marker>
+        </defs>
+        <!-- 正向 -->
+        <text x="60" y="40" fill="#1B6FCC" font-size="14" font-weight="700">🔵 正向切换（OSS → COS）</text>
+        <rect x="60" y="56" width="150" height="56" rx="12" fill="rgba(255,107,107,.12)" stroke="rgba(255,107,107,.3)"/>
+        <text x="135" y="80" text-anchor="middle" fill="#E8553A" font-size="12.5" font-weight="600">切流瞬间落 OSS</text>
+        <text x="135" y="98" text-anchor="middle" fill="#8195A8" font-size="11">新对象写旧存储</text>
+        <path d="M 210 84 L 300 84" fill="none" stroke="#2E86DE" stroke-width="2" marker-end="url(#farr)"/>
+        <rect x="300" y="56" width="200" height="56" rx="12" fill="rgba(46,134,222,.1)" stroke="rgba(46,134,222,.28)"/>
+        <text x="400" y="80" text-anchor="middle" fill="#1B6FCC" font-size="12.5" font-weight="600">切后补迁</text>
+        <text x="400" y="98" text-anchor="middle" fill="#8195A8" font-size="11">copy 到 COS</text>
+        <path d="M 500 84 L 590 84" fill="none" stroke="#2E86DE" stroke-width="2" marker-end="url(#farr)"/>
+        <rect x="590" y="56" width="150" height="56" rx="12" fill="rgba(24,194,156,.12)" stroke="rgba(24,194,156,.3)"/>
+        <text x="665" y="80" text-anchor="middle" fill="#129F7E" font-size="12.5" font-weight="600">两边都有</text>
+        <text x="665" y="98" text-anchor="middle" fill="#8195A8" font-size="11">可正常读</text>
+
+        <!-- 反向 -->
+        <text x="60" y="210" fill="#E8553A" font-size="14" font-weight="700">🔴 回退（COS → OSS）</text>
+        <rect x="60" y="226" width="150" height="56" rx="12" fill="rgba(24,194,156,.12)" stroke="rgba(24,194,156,.3)"/>
+        <text x="135" y="250" text-anchor="middle" fill="#129F7E" font-size="12.5" font-weight="600">切流期间落 COS</text>
+        <text x="135" y="268" text-anchor="middle" fill="#8195A8" font-size="11">新对象写新存储</text>
+        <path d="M 210 254 L 300 254" fill="none" stroke="#E8553A" stroke-width="2" marker-end="url(#barr)"/>
+        <rect x="300" y="226" width="200" height="56" rx="12" fill="rgba(255,107,107,.1)" stroke="rgba(255,107,107,.3)"/>
+        <text x="400" y="250" text-anchor="middle" fill="#E8553A" font-size="12.5" font-weight="600">反向补迁</text>
+        <text x="400" y="268" text-anchor="middle" fill="#8195A8" font-size="11">copy 回 OSS</text>
+        <path d="M 500 254 L 590 254" fill="none" stroke="#E8553A" stroke-width="2" marker-end="url(#barr)"/>
+        <rect x="590" y="226" width="150" height="56" rx="12" fill="rgba(255,107,107,.12)" stroke="rgba(255,107,107,.3)"/>
+        <text x="665" y="250" text-anchor="middle" fill="#E8553A" font-size="12.5" font-weight="600">两边都有</text>
+        <text x="665" y="268" text-anchor="middle" fill="#8195A8" font-size="11">可正常读</text>
+
+        <!-- 对称标注 -->
+        <text x="390" y="330" text-anchor="middle" fill="#6C5CE7" font-size="12.5" font-weight="600">↑ 上下镜像对称：都是"落单的一方 → 补迁到另一边 → 两边都有"</text>
+      </svg>
+      <div class="cap">回退只需把切换期间的增量 copy 回 OSS（OSS 老数据始终在），量小；停留越久增量越大，故回退越早越好</div>
+    </div>
+    <div class="callout warn">
+      <div class="ico">⏱️</div>
+      <p><b>全局回退时效：</b>切换后停留越久，COS-only 增量越大、反向窗口越长。<b>回退越早越好</b>，依赖快速监控判据支撑早发现（见下节）。</p>
+    </div>
+  </section>
+
+  <!-- 八、不可逆决策点 -->
+  <section class="card" id="nodata">
+    <h2><span class="sec-no">8</span>不可逆决策点</h2>
+    <p class="sub">"两边共存 + 补迁兜底"模型只在双副本共存期成立。删 OSS 副本的那一刻，回退就回不去了。</p>
+    <div class="fig">
+      <svg viewBox="0 0 780 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="safe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3DDC97"/><stop offset="1" stop-color="#74B9FF"/></linearGradient>
+          <linearGradient id="danger" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FE9A3D"/><stop offset="1" stop-color="#FF6B6B"/></linearGradient>
+        </defs>
+        <!-- 时间轴 -->
+        <rect x="40" y="80" width="420" height="40" rx="8" fill="url(#safe)" opacity="0.85"/>
+        <text x="250" y="105" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">双副本共存期 · 可回退（仅补增量）</text>
+        <rect x="460" y="80" width="6" height="40" fill="#FF6B6B"/>
+        <text x="463" y="64" text-anchor="middle" fill="#FF6B6B" font-size="12.5" font-weight="700">删 OSS 副本</text>
+        <rect x="466" y="80" width="274" height="40" rx="8" fill="url(#danger)" opacity="0.85"/>
+        <text x="603" y="105" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">不可逆 · 回退=70T 全量回迁</text>
+        <!-- 标注 -->
+        <text x="250" y="150" text-anchor="middle" fill="#129F7E" font-size="12">观察 ≥2 周无异常</text>
+        <text x="603" y="150" text-anchor="middle" fill="#E8553A" font-size="12">回退成本从"分钟级"变"周级"</text>
+        <text x="390" y="185" text-anchor="middle" fill="#8195A8" font-size="11.5">建议分批删除：先删非网盘非专属历史副本；网盘副本随网盘迁移另行评估</text>
+      </svg>
+      <div class="cap">降成本 = 删 OSS 副本。这是方案中唯一真正不可逆的决策，必须满足观察期后执行</div>
+    </div>
+  </section>
+
+  <!-- 九、晋级判据 -->
+  <section class="card" id="gate">
+    <h2><span class="sec-no">9</span>批次晋级判据</h2>
+    <p class="sub">每批切换后须满足以下量化判据方可进入下一批，任一未达即触发该批回退。这是"早发现早回退"的操作化依据。</p>
+    <div class="metrics">
+      <div class="metric"><div class="v">≥24h</div><div class="k">观察时长<br>覆盖业务高峰 + 夜间</div></div>
+      <div class="metric"><div class="v">≥99.9%</div><div class="k">下载成功率<br>按对象数</div></div>
+      <div class="metric"><div class="v">≥99.5%</div><div class="k">回调成功率<br>文件元数据落库</div></div>
+      <div class="metric"><div class="v">≤0.1%</div><div class="k">授权失败率<br>新存储鉴权</div></div>
+    </div>
+    <div class="callout key" style="margin-top:18px">
+      <div class="ico">✓</div>
+      <p><b>其他准入：</b>本批企业无 append 上传流量（新存储不支持该类型）；本批失败对象为 0，若有则<b>整企业移出本批</b>（路由是企业级，无法逐对象排除）。</p>
+    </div>
+  </section>
+
+  <!-- 十、风险与稳态 -->
+  <section class="card" id="risk">
+    <h2><span class="sec-no">10</span>风险与最终稳态</h2>
+    <h3>残留风险</h3>
+    <ul class="clean">
+      <li>不停上传有<b>短暂真空期</b>：切前 + 切后补迁降低影响，但窗口期内对象可能短暂下载失败</li>
+      <li><b>append 上传</b>仅旧存储支持：灰度企业准入时必须确认无此类流量，否则上传中断</li>
+      <li>旧存储<b>不能整体只读</b>：网盘仍需写旧存储，无法通过只读来冻结数据</li>
+      <li>新存储<b>回调失败需人工补齐</b>文件元数据或重试</li>
+    </ul>
+    <h3>最终稳态</h3>
+    <div class="scope-grid" style="margin-top:6px">
+      <div class="scope migrate"><div class="ic">●</div><div><b>非网盘 · 非专属</b><span>默认走 COS</span></div></div>
+      <div class="scope keep"><div class="ic">●</div><div><b>网盘</b><span>继续走 OSS</span></div></div>
+      <div class="scope skip"><div class="ic">●</div><div><b>数据专属企业</b><span>显式存储类型配置</span></div></div>
+      <div class="scope keep"><div class="ic">●</div><div><b>旧存储</b><span>保留网盘能力，观察期后再评估降成本</span></div></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const menuBtn=document.getElementById('menuBtn');
+  const navLinks=document.getElementById('navLinks');
+  menuBtn.addEventListener('click',()=>navLinks.classList.toggle('open'));
+  document.querySelectorAll('.card').forEach(card=>{
+    card.classList.add('tilt');
+    card.addEventListener('mousemove',e=>{
+      const r=card.getBoundingClientRect();
+      const x=(e.clientX-r.left)/r.width-0.5;
+      const y=(e.clientY-r.top)/r.height-0.5;
+      card.style.transform=`translateY(-4px) perspective(900px) rotateX(${(-y*2.5).toFixed(2)}deg) rotateY(${(x*2.5).toFixed(2)}deg)`;
+    });
+    card.addEventListener('mouseleave',()=>{card.style.transform='';});
+  });
+</script>
+</body>
+</html>
