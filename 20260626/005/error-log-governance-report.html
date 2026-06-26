@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fs-fsc-cgi 错误日志治理报告</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 24px; background: #f5f7fa; color: #1f2937; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 24px; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin-bottom: 24px; }
+  h2 { font-size: 18px; margin-top: 32px; margin-bottom: 12px; color: #1e40af; }
+  h3 { font-size: 15px; margin-top: 20px; margin-bottom: 8px; color: #374151; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .stat { text-align: center; padding: 16px; }
+  .stat-num { font-size: 32px; font-weight: 700; }
+  .stat-label { font-size: 13px; color: #6b7280; margin-top: 4px; }
+  .stat-green .stat-num { color: #16a34a; }
+  .stat-yellow .stat-num { color: #ca8a04; }
+  .stat-red .stat-num { color: #dc2626; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 10px 12px; background: #f3f4f6; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+  td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge-warn { background: #fef3c7; color: #92400e; }
+  .badge-error { background: #fee2e2; color: #991b1b; }
+  .badge-done { background: #d1fae5; color: #065f46; }
+  .badge-pending { background: #dbeafe; color: #1e40af; }
+  .summary-box { background: #f0f9ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 14px; }
+  .risk-box { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 14px; }
+  code { background: #f3f4f6; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📋 fs-fsc-cgi 错误日志治理报告</h1>
+
+<div class="card">
+  <p style="font-size:15px;line-height:1.6;">
+    目标：将可预期的客户端/业务输入失败和常态噪音（EOF）从 <span class="badge badge-error">ERROR</span> 移到 <span class="badge badge-warn">WARN</span>，
+    保留真实服务端链路信号（<code>Read timed out</code> / Stone 500）的告警价值。
+    由外部日志采集对 WARN 级别日志设置告警。
+  </p>
+  <p style="font-size:14px;color:#6b7280;margin-top:8px;">
+    分支：<code>feature/lowErrorLog</code> ｜ 提交：3 个 ｜ 状态：<strong style="color:#16a34a">MR1+MR2+NO_FILE_PERMISSION 已完成，待上线</strong>
+  </p>
+</div>
+
+<!-- 统计概览 -->
+<div class="grid">
+  <div class="card stat stat-green">
+    <div class="stat-num">~71,000+</div>
+    <div class="stat-label">已消除的 ERROR / 7 天（预计）</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:4px;">stream no originImageData + EOF + uploadForKuaiXiao</div>
+  </div>
+  <div class="card stat stat-yellow">
+    <div class="stat-num">~2,700</div>
+    <div class="stat-label">剩余保留的 ERROR / 7 天</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:4px;">Read timed out + Stone 500 + 其它零散</div>
+  </div>
+  <div class="card stat stat-red">
+    <div class="stat-num">< 200</div>
+    <div class="stat-label">需人工关注的真实问题</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:4px;">Stone 500 + 其它真错误</div>
+  </div>
+</div>
+
+<!-- 已处理 -->
+<h2>✅ 已治理的 ERROR 类型（已降级为 WARN）</h2>
+
+<div class="card">
+<table>
+<tr><th>类型</th><th>识别特征</th><th>原级别</th><th>新级别</th><th>影响范围</th></tr>
+<tr>
+  <td><code>stream no originImageData</code></td>
+  <td>异常链 message 含 <code>stream no originImageData</code></td>
+  <td>ERROR</td><td><span class="badge badge-warn">WARN</span></td>
+  <td>ProcessFileHandler 三个上传入口 + CreateImageHandler + 统一异常层兜底</td>
+</tr>
+<tr>
+  <td>连接 EOF</td>
+  <td><code>EOFException</code> / <code>IOFileUploadException</code> / <code>Unexpected EOF read on the socket</code></td>
+  <td>ERROR</td><td><span class="badge badge-warn">WARN</span></td>
+  <td>读请求体(ProcessAFileHandler) + Stone 调用(ProcessFileHandler/CreateImageHandler) + 统一异常层兜底</td>
+</tr>
+<tr>
+  <td>trace 框架远端 EOF</td>
+  <td><code>com.github.trace</code> + <code>Unexpected EOF read on the socket</code></td>
+  <td>ERROR</td><td><span class="badge badge-warn">WARN</span></td>
+  <td>TurboFilter 旁路重打为 <code>com.facishare.fsc.demoted-eof</code></td>
+</tr>
+<tr>
+  <td><code>uploadForKuaiXiao</code> path download fail</td>
+  <td><code>fileData == null || fileData.length == 0</code></td>
+  <td>ERROR</td><td><span class="badge badge-warn">WARN</span></td>
+  <td>快消识图 path 下载空文件</td>
+</tr>
+<tr>
+  <td><code>uploadForKuaiXiao</code> FRestClientException 兜底</td>
+  <td>Stone 上传失败 + 返回 400</td>
+  <td>ERROR</td><td><span class="badge badge-warn">WARN</span></td>
+  <td>快消识图 Stone 上传失败（已返回 400，符合"400 皆 WARN"）</td>
+</tr>
+<tr>
+  <td><code>NO_FILE_PERMISSION_CODE</code></td>
+  <td>异常 message 含 <code>NO_FILE_PERMISSION_CODE</code></td>
+  <td>ERROR</td><td><span class="badge badge-warn">WARN</span></td>
+  <td>FileStorageProxy 五个读操作：downloadFile / getFileSize / downloadMp3 / getPreviewInfo / getDocumentPage</td>
+</tr>
+</table>
+</div>
+
+<!-- 剩余 ERROR -->
+<h2>⚠️ 保留 ERROR（未处理，仍保持原级别）</h2>
+
+<div class="card">
+<table>
+<tr><th>类型</th><th>7 天量</th><th>说明</th><th>建议</th></tr>
+<tr>
+  <td><code>Read timed out</code></td>
+  <td>~1355</td>
+  <td>Stone/dataserver/FastDFS 超时，可能是真实存储链路问题</td>
+  <td><span class="badge badge-error">保留 ERROR，建议按 message 文本设告警</span></td>
+</tr>
+<tr>
+  <td>远端 Stone 500 / HTML 500</td>
+  <td>~586</td>
+  <td>远端存储返回 500，含 NPE/Timeout/Socket closed</td>
+  <td><span class="badge badge-error">保留 ERROR，建议按 message 含 return code:500 或 <![CDATA[<]]>html 设告警</span></td>
+</tr>
+<tr>
+  <td>其他零散（NPE、IndexOutOfBounds、非 UTF-8 等）</td>
+  <td>~699</td>
+  <td>需逐个排查，部分可能是真 bug，部分可降级</td>
+  <td><span class="badge badge-error">保留 ERROR，逐条分析后决定是否降级</span></td>
+</tr>
+</table>
+
+<div class="summary-box">
+  <strong>📌 核心结论</strong>：保留的 ERROR 总量约 <strong>~2,700 / 7 天</strong>。其中值得告警的只有 <strong>Read timed out 和 Stone 500 两类（~1,941）</strong>。
+  这两类是服务端链路异常的硬信号，量级尖峰有运维意义。其余零散异常多数是客户端参数错误，
+  建议后续 MR4/MR5 逐步降级或摘要化。
+</div>
+</div>
+
+<!-- 告警规则配置 -->
+<h2>🔔 告警规则建议</h2>
+
+<div class="card">
+<table>
+<tr><th>告警项</th><th>级别</th><th>筛选条件</th></tr>
+<tr>
+  <td>连接 EOF + stream no originImageData</td>
+  <td><span class="badge badge-warn">WARN</span></td>
+  <td><code>logger ~ "c\\.f\\.f\\..*" AND (message CONTAINS "connection EOF" OR "request body read EOF" OR "expected error" OR "demoted from com.github.trace")</code></td>
+</tr>
+<tr>
+  <td>Read timed out</td>
+  <td><span class="badge badge-error">ERROR</span></td>
+  <td><code>message CONTAINS "Read timed out"</code></td>
+</tr>
+<tr>
+  <td>远端 Stone 500</td>
+  <td><span class="badge badge-error">ERROR</span></td>
+  <td><code>message CONTAINS "return code:500"</code></td>
+</tr>
+</table>
+
+<div class="summary-box">
+  <strong>⚠️ 注意</strong>：WARN 告警的配置直接取决于你自己的日志采集系统的 logger 字段格式。
+  线上采用 <code>%logger{12}</code> 缩写，上述正则中的 <code>c\\.f\\.f\\..*</code> 字段可根据实际缩写形式调整。
+</div>
+</div>
+
+<!-- 技术方案 -->
+<h2>🛠 技术方案与决策</h2>
+
+<div class="card">
+<table>
+<tr><th>决策</th><th>说明</th></tr>
+<tr><td>不引入 <code>source</code> 归因字段</td><td>代码层无法可靠区分 EOF 根因（客户端断开可经 stream 透传到 Stone 调用被误判为 remote）。仅靠日志文案区分捕获位置。</td></tr>
+<tr><td><code>CONNECTION_EOF</code> 而非 <code>CLIENT_UPLOAD_EOF</code></td><td>按现象命名，不暗示根因。包含读请求体和远端 Stone 调用两类 EOF。</td></tr>
+<tr><td>TurboFilter 旁路重打而非 DENY</td><td>保留 WARN 日志可查（含原 logger name、message、堆栈、MDC），供外部告警。</td></tr>
+<tr><td>统一异常层 EOF 返回 500 而非 400</td><td>远端 Stone EOF 原本走 500，降级日志不改变接口返回码语义。</td></tr>
+<tr><td><code>NO_FILE_PERMISSION_CODE</code> 仅精准匹配 code 而非所有 FsiClientException</td><td>避免扩大降级范围，不掩盖其它真实下游异常。</td></tr>
+</table>
+</div>
+
+<!-- 进度 -->
+<h2>📊 治理进度</h2>
+
+<div class="card">
+<table>
+<tr><th>阶段</th><th>内容</th><th>状态</th><th>Commit</th></tr>
+<tr>
+  <td>MR1</td><td><code>stream no originImageData</code> 降级 + uploadForKuaiXiao 两处 400→WARN</td>
+  <td><span class="badge badge-done">已完成</span></td>
+  <td><code>b7abe9bb</code></td>
+</tr>
+<tr>
+  <td>MR2</td><td>所有连接 EOF 全量降为 WARN（含 trace 框架 TurboFilter）</td>
+  <td><span class="badge badge-done">已完成</span></td>
+  <td><code>132a58a0</code></td>
+</tr>
+<tr>
+  <td>NO_FILE_PERMISSION</td><td><code>NO_FILE_PERMISSION_CODE</code> 精准降级</td>
+  <td><span class="badge badge-done">已完成</span></td>
+  <td>待提交</td>
+</tr>
+<tr>
+  <td>MR4 剩余</td><td><code>NotFoundException</code> 前置 + 其余 400+ERROR 降 WARN</td>
+  <td><span class="badge badge-pending">未开始</span></td>
+  <td>-</td>
+</tr>
+<tr>
+  <td>MR5</td><td>远端错误日志摘要化（压缩 <code>Read timed out</code> 和 Stone 500 日志体积）</td>
+  <td><span class="badge badge-pending">未开始</span></td>
+  <td>-</td>
+</tr>
+</table>
+</div>
+
+<!-- 结论 -->
+<h2>✅ 结论</h2>
+
+<div class="card">
+<div class="risk-box">
+  <strong>当前治理效果</strong>
+</div>
+<ul style="line-height:1.8;font-size:14px;padding-left:20px;">
+  <li><strong>已消除约 71,000+ 条 / 7 天的 ERROR 噪音</strong>，包括全部的 <code>stream no originImageData</code>（~15,000）、全部 EOF（~48,000）、uploadForKuaiXiao 两类（~1,388）、NO_FILE_PERMISSION_CODE（~86）。</li>
+  <li><strong>剩余 ERROR 约 2,700 / 7 天</strong>，其中值得告警的仅 <code>Read timed out</code> 和 Stone 500（~1,941），其余零散需逐条分析。</li>
+  <li><strong>所有降级仅影响日志级别，不影响业务：</strong>HTTP 返回码、异常传播路径、成功路径行为均未改动。</li>
+  <li><strong>预存失败测试与本次无关：</strong><code>ProcessCaptchaHandlerRouteTest</code>、<code>FsFscCgiDubboConfigTest</code>、<code>DocPreviewProxyTest</code> 在干净树上同样失败。</li>
+  <li><strong>已治理的报错屏蔽后问题很小：</strong>均为可预期的客户端/业务输入失败或连接 EOF 常态噪音，单条不可动作，由外部日志采集对 WARN 设立趋势告警即可。</li>
+</ul>
+</div>
+
+<hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb;">
+<p style="font-size:12px;color:#9ca3af;text-align:center;margin-top:16px;">
+生成日期：2026-06-25 ｜ 版本：v1.0 ｜ 分支：<code>feature/lowErrorLog</code>
+</p>
+
+</div>
+</body>
+</html>
