@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jenkins 机器 workspace 创建命令手册</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Martian+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080b0e;
+      --bg-2: #0c1116;
+      --panel: #10161c;
+      --panel-2: #141c24;
+      --line: #1d2730;
+      --line-2: #283641;
+      --ink: #e8eef4;
+      --muted: #8a98a4;
+      --dim: #5e6b76;
+      --amber: #ffb454;
+      --amber-soft: #ffd08a;
+      --teal: #56d4bb;
+      --teal-dim: #2a8f7e;
+      --red: #ff6b6b;
+      --green: #7ee787;
+      --mono: "JetBrains Mono", "SFMono-Regular", Consolas, Menlo, monospace;
+      --display: "Martian Mono", var(--mono);
+      --sans: "IBM Plex Sans", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      --glow: 0 0 0 1px rgba(255, 180, 84, 0.18), 0 0 22px -4px rgba(255, 180, 84, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 78% -8%, rgba(255, 180, 84, 0.07), transparent 60%),
+        radial-gradient(900px 500px at 8% 8%, rgba(86, 212, 187, 0.05), transparent 55%),
+        var(--bg);
+      font-family: var(--sans);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* faint scanline texture overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.014) 0,
+        rgba(255, 255, 255, 0.014) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      mix-blend-mode: screen;
+      z-index: 1;
+    }
+
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { color: var(--amber-soft); text-decoration: underline; text-underline-offset: 3px; }
+
+    :focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    .page {
+      position: relative;
+      z-index: 2;
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 64px;
+    }
+
+    /* ── masthead ─────────────────────────────────────── */
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 26px;
+    }
+
+    .title-block {
+      padding: 30px 32px 28px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background:
+        linear-gradient(180deg, rgba(255, 180, 84, 0.05), transparent 40%),
+        var(--panel);
+      position: relative;
+      overflow: hidden;
+    }
+    .title-block::after {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--amber), transparent 80%);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      color: var(--amber);
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 10px var(--amber);
+      animation: blink 2.4s ease-in-out infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+    h1 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 800;
+      line-height: 1.12;
+      letter-spacing: -0.01em;
+      color: #fbfdff;
+    }
+
+    .lead {
+      max-width: 580px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .lead code { color: var(--amber-soft); }
+
+    /* facts panel — like a config readout */
+    .facts {
+      padding: 22px 22px 18px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--bg-2);
+      font-family: var(--mono);
+    }
+    .facts-title {
+      margin: 0 0 14px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .fact {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 12px;
+      padding: 11px 0;
+      border-top: 1px solid var(--line);
+    }
+    .fact:first-of-type { border-top: 0; padding-top: 4px; }
+    .fact dt { color: var(--dim); font-size: 12px; letter-spacing: 0.02em; }
+    .fact dd {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--teal);
+      overflow-wrap: anywhere;
+    }
+
+    /* ── nav ──────────────────────────────────────────── */
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      margin: 0 0 34px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel);
+    }
+    nav a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 13px;
+      border-radius: 3px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      transition: color .15s, background .15s;
+    }
+    nav a .num {
+      color: var(--dim);
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    nav a:hover {
+      background: rgba(255, 180, 84, 0.08);
+      color: var(--ink);
+      text-decoration: none;
+    }
+    nav a:hover .num { color: var(--amber); }
+
+    /* ── section ──────────────────────────────────────── */
+    section { margin: 40px 0; scroll-margin-top: 20px; }
+
+    .sec-head {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .sec-num {
+      flex: 0 0 auto;
+      font-family: var(--display);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: 0.05em;
+    }
+    .sec-head h2 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(19px, 2.4vw, 24px);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #fbfdff;
+    }
+    .sec-head p {
+      margin: 0 0 0 auto;
+      max-width: 460px;
+      color: var(--muted);
+      font-size: 13.5px;
+      text-align: right;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .aside {
+      padding: 18px 18px 16px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--bg-2);
+    }
+    .aside h3 {
+      margin: 0 0 10px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .aside p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13.5px;
+    }
+    .aside p code, .aside li code { color: var(--amber-soft); font-family: var(--mono); font-size: 12.5px; }
+
+    /* ── terminal command block ───────────────────────── */
+    .term {
+      margin: 0 0 16px;
+      border: 1px solid var(--line-2);
+      border-radius: 5px;
+      overflow: hidden;
+      background: #050709;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4), 0 12px 30px -16px rgba(0,0,0,0.8);
+    }
+    .term:last-child { margin-bottom: 0; }
+
+    .term-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: linear-gradient(180deg, #16202a, #10161c);
+      border-bottom: 1px solid var(--line-2);
+    }
+    .term-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .term-dots i {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      display: block;
+      background: #2a3640;
+    }
+    .term-label {
+      flex: 1;
+      min-width: 0;
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .term-label .host { color: var(--teal-dim); }
+
+    .copy {
+      flex: 0 0 auto;
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid var(--line-2);
+      border-radius: 3px;
+      background: rgba(255, 180, 84, 0.06);
+      color: var(--amber);
+      cursor: pointer;
+      font: 500 11.5px var(--mono);
+      letter-spacing: 0.02em;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .copy:hover { background: rgba(255, 180, 84, 0.16); border-color: var(--amber); color: var(--amber-soft); }
+    .copy:active { transform: translateY(1px); }
+
+    pre {
+      margin: 0;
+      padding: 16px 18px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: #d6e1ea;
+      text-shadow: 0 0 8px rgba(214, 225, 234, 0.25);
+    }
+    pre code { font-family: inherit; }
+    /* inline shell prompt + comments get a phosphor tint */
+    pre .p { color: var(--amber); }
+    pre .c { color: var(--dim); }
+
+    /* ── checklist ────────────────────────────────────── */
+    .checks {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .checks li {
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 10px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--panel);
+    }
+    .checks .mk {
+      width: 20px; height: 20px;
+      display: grid; place-items: center;
+      border: 1px solid var(--teal-dim);
+      border-radius: 3px;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .checks strong { display: block; font-size: 13.5px; color: var(--ink); }
+    .checks span { display: block; color: var(--muted); font-size: 12.5px; }
+    .checks code { color: var(--amber-soft); font-family: var(--mono); font-size: 12px; }
+
+    /* ── warn callout ─────────────────────────────────── */
+    .warn {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255, 180, 84, 0.3);
+      border-left: 3px solid var(--amber);
+      border-radius: 4px;
+      background: linear-gradient(180deg, rgba(255, 180, 84, 0.07), rgba(255, 180, 84, 0.02));
+    }
+    .warn .ic {
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      border-radius: 3px;
+      background: rgba(255, 180, 84, 0.15);
+      color: var(--amber);
+      font-weight: 800;
+      font-family: var(--display);
+    }
+    .warn b { display: block; margin-bottom: 3px; color: var(--amber-soft); font-size: 14px; }
+    .warn span { color: var(--muted); font-size: 13.5px; }
+    .warn code { color: var(--amber); font-family: var(--mono); font-size: 12.5px; }
+
+    /* ── jenkins param table ─────────────────────────── */
+    .params { display: grid; gap: 8px; }
+    .param {
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 14px;
+      padding: 13px 15px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--panel);
+      transition: border-color .15s;
+    }
+    .param:hover { border-color: var(--line-2); }
+    .param strong {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--amber);
+      font-weight: 500;
+    }
+    .param span { color: var(--muted); font-size: 13.5px; }
+    .param code { color: var(--teal); font-family: var(--mono); font-size: 12.5px; }
+
+    /* ── troubleshooting accordions ───────────────────── */
+    details {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    details + details { margin-top: 8px; }
+    summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 14px 16px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background .15s;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before {
+      content: "▸";
+      color: var(--amber);
+      font-family: var(--display);
+      transition: transform .2s;
+    }
+    details[open] summary::before { transform: rotate(90deg); }
+    summary:hover { background: rgba(255, 180, 84, 0.05); }
+    .dbody {
+      padding: 0 16px 16px 38px;
+      color: var(--muted);
+      font-size: 13.5px;
+    }
+    .dbody code { color: var(--amber-soft); font-family: var(--mono); font-size: 12.5px; }
+
+    /* ── footer ───────────────────────────────────────── */
+    footer {
+      margin-top: 44px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    footer .sig { color: var(--amber); }
+
+    /* ── responsive ────────────────────────────────────── */
+    @media (max-width: 920px) {
+      .masthead { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .sec-head { flex-wrap: wrap; }
+      .sec-head p { margin: 6px 0 0; text-align: left; max-width: none; }
+    }
+    @media (max-width: 560px) {
+      .page { width: calc(100% - 22px); padding-top: 28px; }
+      .title-block, .facts, .aside { padding: 18px; }
+      .param, .fact { grid-template-columns: 1fr; gap: 4px; }
+      .param strong, .fact dt { color: var(--dim); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="masthead">
+      <div class="title-block">
+        <p class="eyebrow">Machine runbook</p>
+        <h1>Jenkins 机器上创建分支 workspace</h1>
+        <p class="lead">在 Jenkins 执行机器上准备一份独立的 <code>fs_autotest_api</code> 分支代码，让 <code>autotest-api-jacoco</code> job 通过 <code>custom_workspace</code> 使用这份代码运行。</p>
+      </div>
+      <aside class="facts" aria-label="本次固定值">
+        <h2 class="facts-title">// 本次固定值</h2>
+        <dl>
+          <div class="fact"><dt>机器目录</dt><dd>/data/jenkins</dd></div>
+          <div class="fact"><dt>仓库</dt><dd>git@git.firstshare.cn:autotest/fs_autotest_api.git</dd></div>
+          <div class="fact"><dt>分支</dt><dd>feat/service-address-profile</dd></div>
+          <div class="fact"><dt>workspace</dt><dd>/data/jenkins/workspace/autotest-api-feat-service-address-profile</dd></div>
+        </dl>
+      </aside>
+    </header>
+
+    <nav aria-label="章节">
+      <a href="#prepare"><span class="num">01</span>准备目录</a>
+      <a href="#clone"><span class="num">02</span>clone 分支</a>
+      <a href="#update"><span class="num">03</span>后续更新</a>
+      <a href="#verify"><span class="num">04</span>机器验证</a>
+      <a href="#jenkins"><span class="num">05</span>Jenkins 参数</a>
+      <a href="#trouble"><span class="num">06</span>异常处理</a>
+    </nav>
+
+    <main>
+
+      <section id="prepare">
+        <div class="sec-head">
+          <span class="sec-num">01 →</span>
+          <h2>登录机器后先准备目录</h2>
+          <p>以下命令在 Jenkins 执行机器上执行，不要在本机执行。</p>
+        </div>
+        <div class="grid">
+          <div>
+            <div class="term">
+              <div class="term-bar">
+                <span class="term-dots"><i></i><i></i><i></i></span>
+                <span class="term-label"><span class="host">jenkins-node</span> ~/workspace</span>
+                <button class="copy" type="button" data-copy="cmd-prepare">复制</button>
+              </div>
+              <pre id="cmd-prepare"><code><span class="p">$</span> mkdir -p /data/jenkins/workspace/autotest-api-feat-service-address-profile
+<span class="p">$</span> cd /data/jenkins/workspace/autotest-api-feat-service-address-profile
+<span class="p">$</span> pwd
+<span class="p">$</span> ls -la</code></pre>
+            </div>
+            <div class="warn">
+              <div class="ic">!</div>
+              <div>
+                <b>不要直接用默认目录</b>
+                <span>不要改 <code>/data/jenkins/workspace/autotest-api</code>。默认目录可能被其他构建使用，独立目录更容易确认代码版本。</span>
+              </div>
+            </div>
+          </div>
+          <aside class="aside">
+            <h3>执行后检查</h3>
+            <ul class="checks">
+              <li><span class="mk">✓</span><span><strong><code>pwd</code> 正确</strong><span>输出应是 <code>/data/jenkins/workspace/autotest-api-feat-service-address-profile</code>。</span></span></li>
+              <li><span class="mk">✓</span><span><strong>目录可写</strong><span><code>ls -la</code> 能正常输出，后续能 clone 文件。</span></span></li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section id="clone">
+        <div class="sec-head">
+          <span class="sec-num">02 →</span>
+          <h2>第一次 clone 分支代码</h2>
+          <p>目录为空时使用这一组命令。执行前先确认本地分支已经 push 到远端。</p>
+        </div>
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dots"><i></i><i></i><i></i></span>
+            <span class="term-label"><span class="host">jenkins-node</span> workspace/autotest-api-feat-service-address-profile</span>
+            <button class="copy" type="button" data-copy="cmd-clone">复制</button>
+          </div>
+          <pre id="cmd-clone"><code><span class="p">$</span> cd /data/jenkins/workspace/autotest-api-feat-service-address-profile
+
+<span class="p">$</span> git clone git@git.firstshare.cn:autotest/fs_autotest_api.git .
+<span class="p">$</span> git checkout feat/service-address-profile
+<span class="p">$</span> git pull --ff-only origin feat/service-address-profile
+
+<span class="p">$</span> git remote -v
+<span class="p">$</span> git branch --show-current
+<span class="p">$</span> git log -1 --oneline
+<span class="p">$</span> git status --short</code></pre>
+        </div>
+      </section>
+
+      <section id="update">
+        <div class="sec-head">
+          <span class="sec-num">03 →</span>
+          <h2>分支有新提交时更新目录</h2>
+          <p>目录已经 clone 过时，不要重新 clone。用这组命令更新到远端最新分支。</p>
+        </div>
+        <div class="grid">
+          <div class="term">
+            <div class="term-bar">
+              <span class="term-dots"><i></i><i></i><i></i></span>
+              <span class="term-label"><span class="host">jenkins-node</span> workspace/autotest-api-feat-service-address-profile</span>
+              <button class="copy" type="button" data-copy="cmd-update">复制</button>
+            </div>
+            <pre id="cmd-update"><code><span class="p">$</span> cd /data/jenkins/workspace/autotest-api-feat-service-address-profile
+
+<span class="p">$</span> git status --short --branch
+<span class="p">$</span> git fetch origin
+<span class="p">$</span> git checkout feat/service-address-profile
+<span class="p">$</span> git pull --ff-only origin feat/service-address-profile
+
+<span class="p">$</span> git branch --show-current
+<span class="p">$</span> git log -1 --oneline
+<span class="p">$</span> git status --short</code></pre>
+          </div>
+          <aside class="aside">
+            <h3>看到本地有改动时</h3>
+            <p>如果 <code>git status --short</code> 有输出，先不要继续 pull。确认是不是上次构建生成的报告或临时文件。</p>
+            <div class="term">
+              <div class="term-bar">
+                <span class="term-dots"><i></i><i></i><i></i></span>
+                <span class="term-label"><span class="host">jenkins-node</span> 只查看，不删除</span>
+                <button class="copy" type="button" data-copy="cmd-dirty">复制</button>
+              </div>
+              <pre id="cmd-dirty"><code><span class="p">$</span> cd /data/jenkins/workspace/autotest-api-feat-service-address-profile
+<span class="p">$</span> git status --short
+<span class="p">$</span> git diff --stat</code></pre>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="verify">
+        <div class="sec-head">
+          <span class="sec-num">04 →</span>
+          <h2>在机器上做基础验证</h2>
+          <p>不跑全量业务用例，只确认分支代码、Python 环境和地址加载器可用。</p>
+        </div>
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dots"><i></i><i></i><i></i></span>
+            <span class="term-label"><span class="host">jenkins-node</span> workspace/autotest-api-feat-service-address-profile</span>
+            <button class="copy" type="button" data-copy="cmd-verify">复制</button>
+          </div>
+          <pre id="cmd-verify"><code><span class="p">$</span> cd /data/jenkins/workspace/autotest-api-feat-service-address-profile
+
+<span class="p">$</span> python3 --version
+<span class="p">$</span> python3 -m pytest tests/address_registry/ -q
+
+<span class="p">$</span> python3 - &lt;&lt;'PY'
+&gt; from utils.address_registry import AddressRegistry
+&gt; r = AddressRegistry('jacoco')
+&gt; for key in ['fs-stone-fileserver', 'fs-stone-metaserver', 'fs-netdisk-biz']:
+&gt;     print(key, r.get(key))
+&gt; PY</code></pre>
+        </div>
+      </section>
+
+      <section id="jenkins">
+        <div class="sec-head">
+          <span class="sec-num">05 →</span>
+          <h2>Jenkins 页面填写参数</h2>
+          <p>机器目录准备好后，进入 <code>autotest-api-jacoco</code> 的 Build with Parameters。</p>
+        </div>
+        <div class="params">
+          <div class="param">
+            <strong>custom_workspace</strong>
+            <span><code>/data/jenkins/workspace/autotest-api-feat-service-address-profile</code></span>
+          </div>
+          <div class="param">
+            <strong>namespace</strong>
+            <span><code>jacoco</code></span>
+          </div>
+          <div class="param">
+            <strong>case</strong>
+            <span><code>testcase/test_fs_stone_fileserver.py</code>，先小范围验证，后面再扩大。</span>
+          </div>
+          <div class="param">
+            <strong>send_report</strong>
+            <span>调试时填 <code>false</code>。</span>
+          </div>
+          <div class="param">
+            <strong>parallel</strong>
+            <span>调试时填 <code>false</code>；需要全量并发时再改 <code>true</code>。</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="trouble">
+        <div class="sec-head">
+          <span class="sec-num">06 →</span>
+          <h2>常见异常处理</h2>
+          <p>只列机器操作相关问题。</p>
+        </div>
+        <details>
+          <summary>git clone 提示没有权限</summary>
+          <div class="dbody">
+            说明 Jenkins 机器上的 SSH key 没有访问 <code>git.firstshare.cn:autotest/fs_autotest_api.git</code> 的权限。先在机器上执行 <code>ssh -T git@git.firstshare.cn</code>。如果不能认证，需要给机器配置可访问该仓库的 SSH key。
+          </div>
+        </details>
+        <details>
+          <summary>git pull 提示不能 fast-forward</summary>
+          <div class="dbody">
+            先执行 <code>git status --short</code> 和 <code>git log --oneline --decorate -5</code> 查看目录状态。不要直接覆盖默认目录；这个独立 workspace 可以确认没有需要保留的改动后再重新建目录。
+          </div>
+        </details>
+        <details>
+          <summary>Jenkins 构建仍然像旧代码</summary>
+          <div class="dbody">
+            登录机器执行 <code>cd /data/jenkins/workspace/autotest-api-feat-service-address-profile &amp;&amp; git log -1 --oneline</code>。同时看 Jenkins Console Output 是否有 SCM checkout 把目录切回 master。
+          </div>
+        </details>
+        <details>
+          <summary>本机能打开 Jenkins，但本机不能跑 jacoco</summary>
+          <div class="dbody">
+            这是正常现象。本机解析不到 jacoco 内部 LB。验证 jacoco 自动化应该放到 Jenkins 机器上跑。
+          </div>
+        </details>
+      </section>
+
+    </main>
+
+    <footer>
+      <span>页面只描述 Jenkins 机器上的 workspace 准备命令，不替代 Jenkins job 配置。</span>
+      <span class="sig">// generated 2026-06-30</span>
+    </footer>
+
+  </div>
+
+  <script>
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const target = document.getElementById(button.dataset.copy);
+        if (!target) return;
+        const text = target.innerText;
+        const old = button.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = '已复制 ✓';
+        } catch (error) {
+          button.textContent = '复制失败';
+        }
+        window.setTimeout(() => { button.textContent = old; }, 1300);
+      });
+    });
+  </script>
+</body>
+</html>
