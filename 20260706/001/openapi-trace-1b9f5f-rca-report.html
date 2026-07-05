@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenAPI Trace 排查报告 — E-O.yqsl100.1004-...</title>
+  <style>
+    :root {
+      --bg: #0a0c10;
+      --surface: #11141b;
+      --surface-2: #181d26;
+      --text: #e8ecf3;
+      --text-muted: #8c96a8;
+      --border: #232b3a;
+      --accent: #f59e0b;
+      --accent-2: #38bdf8;
+      --accent-3: #a78bfa;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --font-display: "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      --font-body: "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", monospace;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f7fa;
+        --surface: #ffffff;
+        --surface-2: #eef1f6;
+        --text: #0f172a;
+        --text-muted: #5a6478;
+        --border: #dde3ec;
+        --accent: #d97706;
+        --accent-2: #0284c7;
+        --accent-3: #7c3aed;
+        --danger: #dc2626;
+        --success: #16a34a;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    a:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 2px; }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+
+    header { margin-bottom: 2.5rem; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .badge::before { animation: none; }
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 1rem 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 660px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-top: 1.25rem;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .meta-item { display: flex; gap: 0.35rem; }
+    .meta-item strong { color: var(--text); font-weight: 600; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .card { box-shadow: 0 4px 24px rgba(0,0,0,0.22); }
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0 0 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .section-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--accent-2);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    .root-cause {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.02));
+      border-left: 4px solid var(--accent);
+    }
+
+    .root-cause h2 { color: var(--accent); }
+
+    .conclusion-text {
+      font-size: 1.125rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .conclusion-text strong { color: var(--accent); }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .metric {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .metric-value.danger { color: var(--danger); }
+    .metric-value.warn { color: var(--accent); }
+    .metric-value.ok { color: var(--success); }
+
+    .timeline {
+      position: relative;
+      padding-left: 1.5rem;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 0.45rem;
+      top: 0.5rem;
+      bottom: 0.5rem;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .timeline-item {
+      position: relative;
+      padding-bottom: 1.5rem;
+    }
+
+    .timeline-item:last-child { padding-bottom: 0; }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -1.2rem;
+      top: 0.35rem;
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--accent-2);
+    }
+
+    .timeline-item.fail::before { border-color: var(--danger); }
+
+    .timeline-item h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+
+    .timeline-item p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .code-block {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--text);
+      white-space: pre;
+      display: block;
+    }
+
+    .highlight { color: var(--accent); font-weight: 600; }
+    .path { color: var(--accent-2); }
+    .value { color: var(--accent-3); }
+
+    .action-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .action-list li {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .action-list li:last-child { border-bottom: none; }
+
+    .action-list li::before {
+      content: "→";
+      color: var(--accent-2);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      margin-right: 0.4rem;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0;
+      padding: 1rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+    }
+
+    .flow-node {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .flow-node.fail {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(239, 68, 68, 0.08);
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 1.25rem 1rem 3rem; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+      .meta { gap: 1rem; }
+      .card { padding: 1.25rem; }
+      .flow-diagram { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">OpenAPI Trace</div>
+      <h1>OpenAPI 文件预签名 URL 请求失败</h1>
+      <p class="subtitle">TraceId <code>E-O.yqsl100.1004-20260706001422-1b9f5f</code> 的端到端链路诊断结果。</p>
+      <div class="meta">
+        <div class="meta-item"><strong>租户</strong> 元气森林（yqsl100）</div>
+        <div class="meta-item"><strong>时间</strong> 2026-07-06 00:14:22</div>
+        <div class="meta-item"><strong>来源</strong> OpenAPI</div>
+        <div class="meta-item"><strong>环境</strong> foneshare prod</div>
+      </div>
+    </header>
+
+    <section class="card root-cause">
+      <h2><span class="section-number">!</span> 根因结论</h2>
+      <p class="conclusion-text">
+        调用方在请求文件预签名 URL 时，将 <strong>过期时间 expire 设为 5,184,000 秒（60 天）</strong>，但 AWS S3 SigV4 预签名 URL 的
+        <strong>最大有效期仅为 7 天</strong>。SDK 在校验时直接拒绝，服务端抛异常并返回 HTTP 500。
+      </p>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">请求过期时间</div>
+          <div class="metric-value danger">5,184,000 s</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">SigV4 最大允许</div>
+          <div class="metric-value ok">604,800 s</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">HTTP 状态码</div>
+          <div class="metric-value danger">500</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">业务错误码</div>
+          <div class="metric-value warn">s309030006</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="section-number">1</span> 调用链路</h2>
+      <div class="flow-diagram">
+        <div class="flow-node">open-api-gateway-web</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node">fs-stone-fileserver</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node fail">fs-stone-cloud</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node fail">AWS S3 SDK</div>
+      </div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <h3>00:14:22.427 OpenAPI 网关入口</h3>
+          <p>open-api-gateway-web 收到请求，URL 为 <code>/fs-stone-proxy/api/v1/file/get_presigned_url</code>。</p>
+        </div>
+        <div class="timeline-item">
+          <h3>00:14:22.386 fs-stone-fileserver 处理</h3>
+          <p>调用 <code>AbstractFileResource.generateUrl</code>，请求体包含 38 个文件路径，expire = <span class="highlight">5184000</span>。</p>
+        </div>
+        <div class="timeline-item">
+          <h3>00:14:22.394 fs-stone-cloud 转调</h3>
+          <p>fileserver 调用 fs-stone-cloud 的 <code>/api/v1/n/get_presigned_url</code>，参数 object_key = <span class="path">yqsl100/2026/06/25079_6a1d02e5af518b0001d252c7.jpg</span>。</p>
+        </div>
+        <div class="timeline-item fail">
+          <h3>00:14:22.395 S3 SDK 校验失败</h3>
+          <p><code>S3StandardService.getPresignedUrl</code> 调用 AWS4Signer 时抛出 <code>SdkClientException</code>：请求过期时间超过 7 天限制。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="section-number">2</span> 核心异常堆栈</h2>
+      <div class="code-block">
+        <code>com.amazonaws.SdkClientException: Requests that are pre-signed by SigV4 algorithm are valid for at most 7 days.
+The expiration date set on the current request [20260903T161422Z] has exceeded this limit.
+
+  at com.amazonaws.auth.AWS4Signer.generateExpirationDate(AWS4Signer.java:626)
+  at com.amazonaws.auth.AWS4Signer.presignRequest(AWS4Signer.java:277)
+  at com.amazonaws.services.s3.AmazonS3Client.generatePresignedUrl(AmazonS3Client.java:3580)
+  at com.facishare.stone.cloud.service.s3Cloud.S3StandardService.getPresignedUrl(S3StandardService.java:764)
+  at com.facishare.stone.cloud.resource.CloudFileResource.getPresignedUrl(CloudFileResource.java:167)</code>
+      </div>
+      <p style="color: var(--text-muted); margin: 0;">
+        异常明确说明：当前请求预设的过期日期 <span class="value">2026-09-03T16:14:22Z</span> 距离请求时间 <span class="value">2026-07-06T00:14:22Z</span> 约 60 天，超过 SigV4 7 天上限。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2><span class="section-number">3</span> 请求参数</h2>
+      <div class="code-block">
+        <code>{
+  "ea": "yqsl100",
+  "business": "UNKNOWN",
+  "employee_id": 0,
+  <span class="highlight">"expire": 5184000,</span>  // 60 天，超过 AWS 7 天上限
+  "temp": false,
+  "object_key": "yqsl100/2026/06/25079_6a1d02e5af518b0001d252c7.jpg"
+}</code>
+      </div>
+      <p style="color: var(--text-muted); margin: 0;">
+        关键问题参数：<span class="tag">expire=5184000</span>。AWS S3 SigV4 预签名 URL 的 expire 必须 ≤ 604,800 秒（7×24×3600）。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2><span class="section-number">4</span> 建议动作</h2>
+      <ul class="action-list">
+        <li>
+          <strong>调用方立即修改 expire 参数</strong><br />
+          将过期时间设置为 7 天以内（推荐 1 小时 ~ 1 天），例如 <span class="tag">expire=86400</span>（1 天）。
+        </li>
+        <li>
+          <strong>检查调用方代码的 expire 计算逻辑</strong><br />
+          确认没有误把毫秒当秒、没有把天数无上限地转成秒，也没有把缓存有效期直接传给预签名 URL。
+        </li>
+        <li>
+          <strong>调用方增加前置校验</strong><br />
+          在发起 OpenAPI 请求前校验 <code>expire ≤ 604800</code>，避免打到服务端再报错。
+        </li>
+        <li>
+          <strong>服务端增强参数校验</strong><br />
+          fs-stone-cloud / fileserver 应在入口处对 expire 做上限校验，超过 7 天返回明确的业务错误码，而不是抛出 AWS SDK 原始异常。
+        </li>
+      </ul>
+    </section>
+
+    <footer>
+      <span>生成时间：2026-07-06</span>
+      <span>基于 app_log_dist 链路分析</span>
+    </footer>
+  </div>
+</body>
+</html>
