@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件存储灰度切换方案评审汇报</title>
+<style>
+/* ============ 设计令牌 ============ */
+:root {
+  --ink: #16233a;
+  --ink-2: #24344f;
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --card-2: #f0f3f8;
+  --accent: #2f5fd0;
+  --accent-soft: #e8effc;
+  --risk: #b45309;
+  --risk-soft: #fdf3e3;
+  --danger: #c0392b;
+  --danger-soft: #fdecea;
+  --success: #178a50;
+  --success-soft: #e6f6ee;
+  --text: #1d2733;
+  --text-2: #55647a;
+  --text-3: #8a97ab;
+  --border: #e2e8f0;
+  --code-bg: #eef1f6;
+  --serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --shadow: 0 1px 3px rgba(22,35,58,.06), 0 4px 14px rgba(22,35,58,.05);
+  --radius: 10px;
+}
+[data-theme="dark"] {
+  --ink: #0d1420;
+  --ink-2: #16233a;
+  --bg: #0f1622;
+  --card: #182235;
+  --card-2: #1f2c44;
+  --accent: #6f97f0;
+  --accent-soft: #1d2c4a;
+  --risk: #e8a34c;
+  --risk-soft: #33270f;
+  --danger: #e57373;
+  --danger-soft: #3a1d1d;
+  --success: #4cc38a;
+  --success-soft: #12281d;
+  --text: #dbe2ec;
+  --text-2: #9fb0c6;
+  --text-3: #6b7c94;
+  --border: #2b3a52;
+  --code-bg: #22304a;
+  --shadow: 0 1px 3px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+}
+/* ============ 基础 ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.75;
+  font-size: 15px;
+  transition: background .3s, color .3s;
+}
+code {
+  font-family: var(--mono);
+  font-size: .88em;
+  background: var(--code-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+/* ============ 布局 ============ */
+.layout { display: flex; max-width: 1280px; margin: 0 auto; }
+/* 侧边目录 */
+.toc {
+  width: 250px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 96px 20px 40px 28px;
+  border-right: 1px solid var(--border);
+}
+.toc-title {
+  font-family: var(--serif);
+  font-size: 13px;
+  letter-spacing: .2em;
+  color: var(--text-3);
+  margin-bottom: 14px;
+}
+.toc a {
+  display: block;
+  padding: 5px 0 5px 14px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  border-left: 2px solid var(--border);
+  transition: all .2s;
+}
+.toc a:hover { color: var(--accent); text-decoration: none; }
+.toc a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+.toc a.sub { padding-left: 30px; font-size: 12.5px; }
+/* 主内容 */
+.main { flex: 1; min-width: 0; padding: 0 48px 120px; }
+section { scroll-margin-top: 20px; }
+/* ============ 顶部横幅 ============ */
+.hero {
+  background: linear-gradient(135deg, #16233a 0%, #24344f 55%, #2f5fd0 130%);
+  color: #fff;
+  padding: 72px 48px 56px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  right: -80px; top: -80px;
+  width: 340px; height: 340px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 50%;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  right: 40px; bottom: -140px;
+  width: 260px; height: 260px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 50%;
+}
+.hero-tag {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: .35em;
+  color: #9db8e8;
+  border: 1px solid rgba(157,184,232,.35);
+  padding: 4px 14px;
+  border-radius: 999px;
+  margin-bottom: 20px;
+}
+.hero h1 {
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  margin-bottom: 10px;
+  position: relative;
+}
+.hero-sub { color: #a8bdd9; font-size: 14px; position: relative; }
+/* 元信息卡 */
+.meta-card {
+  position: relative;
+  margin-top: 34px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius);
+  padding: 8px 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.meta-item {
+  display: flex;
+  gap: 14px;
+  padding: 14px 24px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.meta-item:nth-last-child(-n+2) { border-bottom: none; }
+.meta-item:nth-child(odd) { border-right: 1px solid rgba(255,255,255,.08); }
+.meta-label {
+  flex-shrink: 0;
+  width: 64px;
+  font-size: 12.5px;
+  color: #8fa8cc;
+  padding-top: 2px;
+}
+.meta-value { font-size: 13.5px; color: #e8eef7; line-height: 1.65; }
+/* ============ 章节标题 ============ */
+h2.sec {
+  font-family: var(--serif);
+  font-size: 25px;
+  color: var(--ink);
+  margin: 64px 0 6px;
+  padding-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+[data-theme="dark"] h2.sec { color: var(--text); }
+h2.sec .num {
+  font-size: 15px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-weight: 600;
+  border: 1.5px solid var(--accent);
+  border-radius: 6px;
+  padding: 1px 9px;
+  position: relative;
+  top: -3px;
+}
+.sec-rule {
+  height: 3px;
+  width: 56px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  border-radius: 2px;
+  margin-bottom: 26px;
+}
+h3 {
+  font-size: 17.5px;
+  font-weight: 700;
+  margin: 34px 0 12px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+h3::before {
+  content: "";
+  width: 4px; height: 16px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+h4 { font-size: 15px; font-weight: 700; margin: 24px 0 10px; color: var(--text-2); }
+p { margin-bottom: 12px; color: var(--text); }
+ul, ol { margin: 0 0 14px 22px; }
+li { margin-bottom: 6px; }
+li::marker { color: var(--accent); }
+strong { color: var(--ink); }
+[data-theme="dark"] strong { color: #fff; }
+/* ============ 卡片与表格 ============ */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+}
+.tbl-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+  background: var(--card);
+}
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th {
+  background: var(--ink);
+  color: #dce6f5;
+  text-align: left;
+  padding: 10px 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-size: 13px;
+  letter-spacing: .03em;
+}
+td {
+  padding: 11px 16px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.65;
+}
+tr:nth-child(even) td { background: var(--card-2); }
+td:first-child { font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+[data-theme="dark"] td:first-child { color: var(--text); }
+/* ============ 配图 ============ */
+figure {
+  margin: 22px 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+figure img {
+  width: 100%;
+  border-radius: 6px;
+  display: block;
+  cursor: zoom-in;
+}
+figcaption {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-top: 10px;
+  letter-spacing: .05em;
+}
+/* ============ 发布节奏 stepper ============ */
+.stepper { margin: 24px 0; }
+.step {
+  display: flex;
+  gap: 20px;
+  position: relative;
+  padding-bottom: 26px;
+}
+.step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 19px; top: 42px; bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.step-dot {
+  flex-shrink: 0;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  position: relative;
+  z-index: 1;
+}
+.step-body {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  box-shadow: var(--shadow);
+}
+.step-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.step-action { font-size: 13.5px; color: var(--text-2); margin-bottom: 8px; }
+.step-gate {
+  font-size: 12.5px;
+  color: var(--success);
+  background: var(--success-soft);
+  border-radius: 6px;
+  padding: 6px 12px;
+  display: inline-block;
+}
+.step-gate::before { content: "进入条件 · "; font-weight: 700; }
+/* ============ 回滚分级 ============ */
+.level-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+.level-card {
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  border-top: 4px solid var(--success);
+}
+.level-card.l2 { border-top-color: var(--risk); }
+.level-tag {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+.level-card.l1 .level-tag { color: var(--success); }
+.level-card.l2 .level-tag { color: var(--risk); }
+.level-name { font-weight: 700; font-size: 15px; margin: 6px 0 4px; }
+.level-scene { font-size: 12.5px; color: var(--text-3); margin-bottom: 8px; }
+.level-do { font-size: 13.5px; color: var(--text-2); }
+/* ============ 状态清单 ============ */
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.status-box { border-radius: var(--radius); padding: 18px 20px; border: 1px solid var(--border); }
+.status-box.done { background: var(--success-soft); border-color: var(--success); }
+.status-box.todo { background: var(--risk-soft); border-color: var(--risk); }
+.status-box h4 {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+}
+.status-box.done h4 { color: var(--success); }
+.status-box.todo h4 { color: var(--risk); }
+.status-box ul { margin-left: 20px; margin-bottom: 0; }
+.status-box li { font-size: 13.5px; margin-bottom: 5px; }
+/* ============ 注记 ============ */
+.note {
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 18px;
+  margin: 14px 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+/* ============ 主题切换 & 工具 ============ */
+.tools {
+  position: fixed;
+  top: 18px; right: 24px;
+  z-index: 100;
+  display: flex;
+  gap: 10px;
+}
+.tool-btn {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+}
+.tool-btn:hover { color: var(--accent); border-color: var(--accent); }
+/* ============ 灯箱 ============ */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10,16,26,.9);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+/* ============ 页脚 ============ */
+footer {
+  margin-top: 80px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 12.5px;
+  display: flex;
+  justify-content: space-between;
+}
+/* ============ 响应式 ============ */
+@media (max-width: 960px) {
+  .toc { display: none; }
+  .main { padding: 0 22px 80px; }
+  .hero { padding: 56px 24px 44px; }
+  .meta-card { grid-template-columns: 1fr; }
+  .meta-item { border-right: none !important; }
+  .meta-item:nth-last-child(2) { border-bottom: 1px solid rgba(255,255,255,.08); }
+  .level-grid, .status-grid { grid-template-columns: 1fr; }
+}
+/* ============ 打印 ============ */
+@media print {
+  .toc, .tools, .lightbox { display: none !important; }
+  .main { padding: 0; }
+  body { background: #fff; }
+  .hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .card, .tbl-wrap, figure, .step-body { box-shadow: none; }
+  section { break-inside: avoid-page; }
+}
+</style>
+</head>
+<body>
+
+<div class="tools">
+  <button class="tool-btn" id="themeBtn" title="切换深色模式">◐</button>
+  <button class="tool-btn" onclick="window.print()" title="打印 / 导出 PDF">⎙</button>
+</div>
+
+<!-- ============ 顶部横幅 ============ -->
+<header class="hero">
+  <span class="hero-tag">技 术 方 案 评 审</span>
+  <h1>文件存储灰度切换方案评审汇报</h1>
+  <div class="hero-sub">纷享销客存储体系 · FastDFS → COS 灰度写入 · 单写方案</div>
+  <div class="meta-card">
+    <div class="meta-item"><span class="meta-label">评审目标</span><span class="meta-value">在纷享销客存储体系内，将部分客户的新文件从 FastDFS 灰度写入 COS</span></div>
+    <div class="meta-item"><span class="meta-label">灰度范围</span><span class="meta-value">仅纷享销客存储客户，按客户逐步扩大</span></div>
+    <div class="meta-item"><span class="meta-label">方案性质</span><span class="meta-value">单写，不做 FastDFS 与 COS 双写；异常时停止新增 COS 写入，不做数据回迁</span></div>
+    <div class="meta-item"><span class="meta-label">灾备策略</span><span class="meta-value">COS 开启多 AZ；应用回收区与 COS 版本控制、生命周期共同提供删除保护；不建设独立跨地域备份</span></div>
+    <div class="meta-item" style="grid-column: 1 / -1; border-right: none;"><span class="meta-label">上线前置</span><span class="meta-value">完成真实 COS 端到端验证、两类恢复演练、观测与配置核对</span></div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ============ 侧边目录 ============ -->
+  <nav class="toc" id="toc">
+    <div class="toc-title">目 录</div>
+    <a href="#sec1" class="active">1 · 背景介绍</a>
+    <a href="#sec2">2 · 准备事项</a>
+    <a href="#sec3">3 · 发布节奏</a>
+    <a href="#sec4">4 · 操作说明</a>
+    <a href="#sec5">5 · 验证说明</a>
+    <a href="#sec6">6 · 回滚方案</a>
+    <a href="#sec7">7 · 风险评估</a>
+  </nav>
+
+  <!-- ============ 主内容 ============ -->
+  <main class="main">
+
+    <!-- ============ 1 背景介绍 ============ -->
+    <section id="sec1">
+      <h2 class="sec"><span class="num">01</span>背景介绍</h2>
+      <div class="sec-rule"></div>
+
+      <h3>1.1 改造目标</h3>
+      <p>文件存储一共分为两类：<strong>纷享销客存储</strong>和<strong>数据专属客户存储</strong>。</p>
+      <ul>
+        <li><strong>纷享销客存储</strong>：原有 FastDFS，本次新增 COS，按客户进行灰度。</li>
+        <li><strong>数据专属客户存储</strong>：保持原有独立存储方式，不参与本次 COS 灰度。</li>
+      </ul>
+      <p>本次改造<strong>不要求迁移</strong>纷享销客存储中的存量 FastDFS 文件。存量文件继续保留在 FastDFS，新文件根据灰度策略选择 FastDFS 或 COS。</p>
+
+      <h3>1.2 变更前后</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>对比项</th><th>变更前</th><th>变更后</th></tr></thead>
+          <tbody>
+            <tr><td>纷享销客存储</td><td>使用 FastDFS</td><td>增加 COS，可按客户灰度</td></tr>
+            <tr><td>数据专属客户存储</td><td>使用客户独立存储</td><td>保持原有方式，不参与灰度</td></tr>
+            <tr><td>存量文件</td><td>从原存储读取</td><td>继续从原存储读取，不要求迁移</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>1.3 整体模型</h3>
+      <figure>
+        <img src="assets/file-storage-routing.png" alt="文件存储架构与分流模型">
+        <figcaption>文件存储架构与分流模型 —— 蓝色区域为新文件写入，绿色区域为已有文件读取</figcaption>
+      </figure>
+      <p>先区分客户属于哪套存储体系，再在纷享销客存储内选择 FastDFS 或 COS。方案遵循三个原则：</p>
+      <ol>
+        <li><strong>存储体系先确定</strong>：客户使用纷享销客存储或数据专属客户存储。</li>
+        <li><strong>纷享销客存储内部灰度</strong>：新文件在 FastDFS 和 COS 中选择一个目标。</li>
+        <li><strong>已有文件按记录读取</strong>：读取不看当前灰度状态，根据文件记录中是否存在对象存储信息选择通道。即使灰度名单发生变化，已有文件仍然访问原存储位置，避免读取目标随名单变化，最大程度保证文件访问的可用性。</li>
+      </ol>
+      <p>因此，同一纷享销客存储客户可以同时存在存量 FastDFS 文件和新 COS 文件，业务侧不需要感知文件的物理位置。</p>
+
+      <h3>1.4 本次改造边界</h3>
+      <p>本次改造只调整纷享销客存储内部的新文件写入方式，不改变现有业务接口。</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>评审项</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>改造范围</td><td>仅纷享销客存储客户参与灰度，数据专属客户保持原有方式</td></tr>
+            <tr><td>数据策略</td><td>存量文件不迁移；新文件单写 FastDFS 或 COS，不做双写</td></tr>
+            <tr><td>长期状态</td><td>同一客户可以同时存在存量 FastDFS 文件和新 COS 文件，业务侧无感知</td></tr>
+            <tr><td>灰度退出</td><td>新文件恢复写入 FastDFS，已有 COS 文件继续正常访问</td></tr>
+            <tr><td>异常处置</td><td>关闭灰度，停止新增 COS 写入；已有 COS 文件继续保留和访问，不做回迁</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><strong>为什么不做双写：</strong>上传请求以单向文件流处理，同一个文件流不能直接同时写入两套存储。建设双写需要额外缓存或复制文件内容，并同时承担两套存储的写入压力，会明显增加服务内存、网络和并发负载，同时引入更多失败组合和一致性处理。本期采用单写，避免为灰度增加不必要的稳定性风险。</div>
+      <div class="note"><strong>为什么不做回迁：</strong>方案按照测试企业、FS 流量、少量真实企业到逐步扩大的顺序发布。文件上传、下载、预览等核心行为发生异常时表现直接，可以在测试和小范围灰度阶段及时发现。重大问题预计会在进入大范围真实企业前暴露，影响范围被限制在当前灰度企业内；此时可以停止放量并关闭灰度，阻止新增 COS 写入。已有 COS 文件继续按文件记录访问，不再通过数据迁移引入额外的一致性和稳定性风险。</div>
+      <div class="note">如果同一客户同时出现在数据专属名单和 COS 灰度名单中，以数据专属存储为先，不进入纷享销客 COS。</div>
+
+      <h3>1.5 核心业务变化</h3>
+
+      <h4>1.5.1 业务影响范围</h4>
+      <p>总体来说，业务侧对本次改动无感知。上传、下载、预览、转正式、删除等操作方式和现有业务接口保持不变，存储选择由文件服务内部完成。</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>业务操作</th><th>变更后的处理方式</th><th>用户感知</th></tr></thead>
+          <tbody>
+            <tr><td>普通上传</td><td>先确定客户存储体系，再选择具体存储</td><td>无</td></tr>
+            <tr><td>文件下载和预览</td><td>根据文件记录中的实际存储信息读取</td><td>无</td></tr>
+            <tr><td>临时文件转正式</td><td>继承临时文件的实际存储体系，按源文件类型复制、复用或重新保存</td><td>无</td></tr>
+            <tr><td>文件分片上传</td><td>与普通上传使用同一存储选择规则，开始后保持一致</td><td>无</td></tr>
+            <tr><td>删除和恢复</td><td>先执行业务逻辑删除和应用回收，再由 COS 版本控制和生命周期提供延时保护</td><td>无</td></tr>
+            <tr><td>文件访问地址</td><td>根据文件记录生成对应存储的访问地址</td><td>无</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>1.5.2 普通上传</h4>
+      <p>上传时按以下顺序选择存储：</p>
+      <ol>
+        <li>数据专属客户写入数据专属客户存储。</li>
+        <li>纷享销客存储客户命中灰度名单时写入 COS。</li>
+        <li>其他纷享销客存储客户继续写入 FastDFS。</li>
+      </ol>
+      <p>第 1 条的优先级最高。灰度名单只改变纷享销客存储客户的新文件写入目标，不会改变数据专属客户的存储归属。</p>
+      <p>系统只写一个目标，不会同时保存 FastDFS 和 COS 两份文件。文件写入成功后，系统保存用于后续定位文件的元数据：</p>
+      <ul>
+        <li>FastDFS 文件：存储组和文件 ID。</li>
+        <li>对象存储文件：存储桶、对象名和对象存储返回的类型信息。</li>
+      </ul>
+      <h4>1.5.3 临时文件转正式</h4>
+      <p>临时文件首次上传时确定存储体系。转正式时以临时文件记录的实际存储信息为准，不再根据转正式时的灰度名单重新选择 FastDFS 或 COS。具体处理方式如下：</p>
+      <ul>
+        <li><strong>对象存储普通文件</strong>：在同一客户存储体系内复制对象，并生成正式文件记录。纷享销客 COS 文件从临时桶复制到正式桶，存储体系不变。</li>
+        <li><strong>FastDFS 普通文件</strong>：满足复用条件时复用原物理文件；其他情况会读取临时文件并重新保存到 FastDFS。</li>
+        <li><strong>需要图片处理的文件</strong>：读取原图，完成格式、尺寸或缩略处理后生成新文件，新文件继续写入原图所在的存储体系。</li>
+      </ul>
+      <div class="note">临时文件和正式文件可以位于不同的桶或对象路径，但不会在 FastDFS 和 COS 之间改变存储体系。灰度名单调整只影响后续新上传，不影响已经生成的临时文件转正式。</div>
+
+      <h4>1.5.4 文件分片上传</h4>
+      <p>分片上传与普通上传使用同一存储选择顺序：先确定客户存储体系，再判断纷享销客存储客户是否命中 COS 灰度。文件在开始上传时确定目标存储，后续分片及完成动作根据开始阶段保存的文件记录继续执行。</p>
+      <p>在客户存储体系不发生变更的前提下，即使上传过程中调整灰度名单，已经开始的文件也不会在 FastDFS 和纷享销客 COS 之间改变存储。<strong>客户存储体系变更不在本期灰度操作范围内，发生时必须先完成数据迁移。</strong></p>
+      <div class="note">未完成的 COS 分片不会被业务代码主动取消。临时桶必须配置“未完成分片上传过期清理”规则。</div>
+
+      <h4>1.5.5 删除和文件引用</h4>
+      <p>删除操作根据文件记录访问对应存储。多个业务记录引用同一个 COS 对象时，系统查询同一对象的其他引用；仍有引用时不处理物理对象，没有其他引用时才进入应用回收和后续物理清理流程。</p>
+
+      <h3>1.6 数据读取</h3>
+
+      <h4>1.6.1 读取方式</h4>
+      <p>文件服务先根据文件记录选择 FastDFS 或对象存储通道：</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>文件记录</th><th>读取方式</th></tr></thead>
+          <tbody>
+            <tr><td>存在对象存储对象标识</td><td>进入对象存储通道</td></tr>
+            <tr><td>不存在对象存储对象标识</td><td>从 FastDFS 读取</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>进入对象存储通道后，再根据客户存储体系访问纷享销客 COS 或数据专属客户存储。客户存储体系变更必须配套数据迁移，不属于本期灰度范围。</p>
+      <div class="note">读取逻辑与当前灰度名单无关。某客户退出灰度后，已有 COS 文件仍然从 COS 读取，新文件则恢复写入 FastDFS。</div>
+
+      <h4>1.6.2 存量数据兼容</h4>
+      <p>存量 FastDFS 文件本来就没有对象存储对象标识，会继续进入 FastDFS 读取通道。本次不需要全量回填新字段，也不需要为了兼容读取而迁移存量文件。</p>
+    </section>
+
+    <!-- ============ 2 准备事项 ============ -->
+    <section id="sec2">
+      <h2 class="sec"><span class="num">02</span>准备事项</h2>
+      <div class="sec-rule"></div>
+
+      <h3>2.1 研发与协同准备</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>准备事项</th><th>要求</th><th>时间</th></tr></thead>
+          <tbody>
+            <tr><td>程序改造与验证</td><td>已完成程序改造，并通过人工测试和自动化核心场景测试；线下环境已运行近一个月，期间代码有调整，但整体逻辑和架构保持不变</td><td>已完成当前阶段验证</td></tr>
+            <tr><td>SET 化环境部署与测试</td><td>完成独立 SET 环境部署、配置核对和基础测试</td><td>本周</td></tr>
+            <tr><td>ABU 客户灰度通知</td><td>确认最终阶段客户范围并完成灰度通知</td><td>最终灰度阶段前一周</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>2.2 环境与存储配置</h3>
+      <ul>
+        <li>对象存储按照原 FastDFS 的九套分区架构创建九套存储配置，每套包含正式桶和临时桶两个独立的物理桶。</li>
+        <li>九套存储资源均已准备完毕，桶权限、网络、地域、访问凭证和代理配置已完成。</li>
+        <li>正式桶和临时桶已按方案开启多 AZ、版本控制及对应生命周期；临时桶已配置未完成分片上传的过期清理规则。</li>
+      </ul>
+
+      <h3>2.3 名单、观测与责任</h3>
+      <ul>
+        <li>灰度客户必须属于纷享销客存储；如果同时命中数据专属名单和 COS 灰度名单，以数据专属存储为先。</li>
+        <li>SET 路由与存储切换是两处独立配置，发布前必须核对企业集合完全一致。</li>
+        <li>准备监控看板、告警阈值、每批观察时长和停止灰度的操作权限。</li>
+        <li><strong>操作人：</strong>刘云松</li>
+        <li><strong>验证人：</strong>刘云松、安宜龙</li>
+        <li><strong>观测人：</strong>刘云松、安宜龙</li>
+      </ul>
+    </section>
+
+    <!-- ============ 3 发布节奏 ============ -->
+    <section id="sec3">
+      <h2 class="sec"><span class="num">03</span>发布节奏</h2>
+      <div class="sec-rule"></div>
+
+      <h3>3.1 发布阶段</h3>
+      <p>本次发布采用独立 SET 环境承接流量，按照"<strong>测试企业、FS 流量、真实企业、全网</strong>"的顺序逐级扩大。每个阶段验证通过后，才能进入下一阶段。</p>
+      <figure>
+        <img src="assets/file-storage-release-rollout.png" alt="文件存储灰度发布节奏">
+        <figcaption>文件存储灰度发布节奏</figcaption>
+      </figure>
+
+      <div class="stepper">
+        <div class="step"><div class="step-dot">1</div><div class="step-body">
+          <div class="step-name">创建 SET 环境</div>
+          <div class="step-action">单独创建 SET 化环境，发布本次存储改造涉及的新代码，不直接承接全网流量。</div>
+          <span class="step-gate">非灰度 FastDFS 企业和数据专属客户的核心请求正常</span>
+        </div></div>
+        <div class="step"><div class="step-dot">2</div><div class="step-body">
+          <div class="step-name">创建灰度名单</div>
+          <div class="step-action">SET 路由和存储切换是两处独立配置，必须使用完全一致的企业集合。</div>
+          <span class="step-gate">发布前比对两处配置，名单外客户不进入 SET、不切换存储</span>
+        </div></div>
+        <div class="step"><div class="step-dot">3</div><div class="step-body">
+          <div class="step-name">导入测试企业流量</div>
+          <div class="step-action">选择部分测试企业，将其流量导入 SET 环境并开启 COS 写入。</div>
+          <span class="step-gate">新文件写入位置正确，存量文件读取不受影响</span>
+        </div></div>
+        <div class="step"><div class="step-dot">4</div><div class="step-body">
+          <div class="step-name">完成测试与观察</div>
+          <div class="step-action">执行自动化和人工测试，观察错误日志及核心指标。</div>
+          <span class="step-gate">核心场景通过，观察期无阻断性问题</span>
+        </div></div>
+        <div class="step"><div class="step-dot">5</div><div class="step-body">
+          <div class="step-name">导入 FS 流量</div>
+          <div class="step-action">在测试企业验证通过后导入 FS 流量，验证更接近生产规模时的稳定性。</div>
+          <span class="step-gate">业务结果正确，容量和性能指标保持在发布阈值内</span>
+        </div></div>
+        <div class="step"><div class="step-dot">6</div><div class="step-body">
+          <div class="step-name">导入真实企业流量</div>
+          <div class="step-action">按批次导入真实企业流量，每批选择少量企业并保留观察时间。</div>
+          <span class="step-gate">每批验证通过，异常可以通过移出名单及时停止新增 COS 写入</span>
+        </div></div>
+        <div class="step"><div class="step-dot">7</div><div class="step-body">
+          <div class="step-name">全网发布</div>
+          <div class="step-action">前述阶段持续稳定后，将剩余纷享销客存储企业逐步纳入，最终完成全网发布。</div>
+          <span class="step-gate">全网指标稳定，回滚和恢复能力保持可用</span>
+        </div></div>
+      </div>
+
+      <h3>3.2 放量条件</h3>
+      <ul>
+        <li>SET 化路由和存储切换由两套配置管理，应用代码无法自动比对。发布前必须校验两处企业集合完全一致，变更时作为同一个发布动作执行。</li>
+        <li>每次只推进一个阶段，不同时导入 FS 流量和真实企业流量。</li>
+        <li>真实企业按批次导入，每批完成自动化验证、人工验证和日志观察后再扩大。</li>
+        <li>测试企业流量导入前，必须在发布单中填写错误率、响应时间、内存和观察时长阈值；没有明确阈值时不得进入下一阶段。</li>
+        <li>任一阶段出现异常，立即停止新增流量并移出相关企业；新文件恢复写入 FastDFS，已有 COS 文件仍按文件记录读取。</li>
+        <li>全网发布是逐步扩大后的最终状态，不采用一次性全量放开的方式。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 4 操作说明 ============ -->
+    <section id="sec4">
+      <h2 class="sec"><span class="num">04</span>操作说明</h2>
+      <div class="sec-rule"></div>
+
+      <h3>4.1 灰度调整与暂停</h3>
+      <p>扩大灰度时，将同一批企业同时加入 SET 路由和存储切换配置，确认两处配置生效且企业集合一致后，再导入对应流量。</p>
+      <p>出现异常时，从两处配置同步移除客户或关闭灰度规则。配置发布和服务节点接收存在传播时延，以实际节点配置生效为准：</p>
+      <ul>
+        <li>新文件恢复写入 FastDFS。</li>
+        <li>已有 FastDFS 文件继续读取 FastDFS。</li>
+        <li>已有 COS 文件继续读取 COS。</li>
+        <li>对象存储服务和读取能力继续保留。</li>
+      </ul>
+      <div class="note">暂停灰度生效后，需要持续验证已有 COS 文件的读取、删除和转正式，不能立即下线对象存储相关服务。</div>
+
+      <h3>4.2 观察指标</h3>
+      <p>重点观察：</p>
+      <ul>
+        <li>服务错误日志数量。</li>
+        <li>Tomcat 日志中的响应时间和响应失败数量。</li>
+        <li>服务内存和 CPU 指标。</li>
+      </ul>
+      <p>每批放量后持续观察以上指标，出现明显异常时暂停放量。</p>
+
+      <h3>4.3 数据灾备与删除保护</h3>
+      <p>本节只说明纷享销客 COS 的灾备和删除保护。数据专属客户存储继续执行客户自己的灾备方案，不纳入本次改造。</p>
+      <p>删除保护包含两层：应用侧维护业务回收记录和回收对象；COS 存储桶侧开启版本控制和生命周期。应用代码不负责创建或修改 COS 存储桶配置。</p>
+
+      <h4>4.3.1 灾备范围</h4>
+      <p>本方案使用 COS 多 AZ 覆盖单机房和单可用区故障，不将其视为跨地域备份。</p>
+      <p>本期<strong>不建设跨地域复制</strong>，也不建设另一套独立冷备份。该决策意味着：</p>
+      <ul>
+        <li>单机房或单可用区故障由多 AZ 自动处理。</li>
+        <li>北京地域整体不可用时，本系统没有可主动切换的异地副本，需要等待腾讯云恢复服务。</li>
+        <li>版本历史进入归档存储，仍属于同一地域、同一存储体系，不属于独立备份。</li>
+      </ul>
+      <div class="note">跨地域副本在区域级故障时仍有恢复价值。本期基于成本、复杂度和风险评估，不建设跨地域备份，并由评审明确接受区域级剩余风险。</div>
+
+      <h4>4.3.2 删除保护机制</h4>
+      <p>删除采用"<strong>业务逻辑删除 + 应用回收区 + COS 版本保护 + 延时物理删除</strong>"：</p>
+      <ol>
+        <li>用户删除文件后，文件记录先失效，此时不删除 COS 对象。</li>
+        <li>程序 GC 在文件达到清理条件且没有其他引用后，将对象和文件记录移入应用回收区；默认 25 天后清理。清理前可通过应用恢复，清理后通过 COS 历史版本恢复。</li>
+        <li>COS 开启版本控制后，应用的移动和删除动作会产生删除标记并保留历史版本。每个版本从成为非当前版本时开始独立计时。</li>
+        <li>非当前版本满 1 天后转为归档存储，满 120 天后永久删除，最后清理已失效的删除标记。</li>
+      </ol>
+      <div class="note"><strong>25 天的含义：</strong>25 天是程序 GC 的默认清理阈值，不是 COS 存储桶生命周期配置。</div>
+      <p>本方案中的“应用回收区”和“COS 版本恢复”是两种不同能力。前者由文件服务程序 GC 实现，后者由 COS 存储桶配置提供。</p>
+      <figure>
+        <img src="assets/file-storage-dr-lifecycle.png" alt="数据灾备与删除保护流程">
+        <figcaption>数据灾备与删除保护流程</figcaption>
+      </figure>
+
+      <h4>4.3.3 120 天生命周期</h4>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>时间</th><th>文件状态</th><th>存储方式</th><th>是否可恢复</th></tr></thead>
+          <tbody>
+            <tr><td>用户删除时</td><td>文件记录失效，COS 对象保持不变</td><td>原存储状态</td><td style="color:var(--success);font-weight:600;">可以</td></tr>
+            <tr><td>程序 GC</td><td>符合条件后进入应用回收区，默认 25 天后清理</td><td>应用回收区；COS 版本保护</td><td style="color:var(--success);font-weight:600;">清理前可应用恢复，清理后可通过 COS 版本恢复</td></tr>
+            <tr><td>任一版本成为非当前版本满 1 天</td><td>历史版本仍存在</td><td>转为归档存储（多 AZ）</td><td style="color:var(--success);font-weight:600;">可恢复，需要先解冻</td></tr>
+            <tr><td>任一非当前版本满 120 天</td><td>该历史版本达到保留期限</td><td>永久删除该版本并清理失效删除标记</td><td style="color:var(--danger);font-weight:600;">不可通过该版本恢复</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>COS 生命周期从某个对象版本成为非当前版本时开始计算，不从用户逻辑删除时间或最初上传时间计算。原路径和应用回收路径下的历史版本可能在不同时间开始计时，因此各自计算 120 天保留期。</p>
+
+      <h4>4.3.4 恢复方式</h4>
+      <ul>
+        <li><strong>应用回收区恢复</strong>：对象和文件记录仍在应用回收区时，使用现有恢复能力将对象移回原路径，这是优先使用的恢复方式。</li>
+        <li><strong>COS 历史版本恢复</strong>：应用回收记录已清理，或需处理底层误删时，由运维根据对象路径和版本恢复指定历史版本，并同步恢复业务记录。</li>
+        <li><strong>归档版本恢复</strong>：先提交解冻任务，对象可读后再执行版本和业务记录恢复。</li>
+        <li><strong>超过版本保留期</strong>：对应历史版本已物理删除，无法通过该版本恢复。</li>
+      </ul>
+      <p>归档存储恢复需要等待，实际耗时取决于当期 COS 支持的取回模式和对象规模。因此，“120 天内可恢复”表示在历史版本保留期内可发起恢复，不代表立即可用。</p>
+      <div class="note">生产桶创建前，需要根据当期腾讯云官方文档和控制台重新确认可用的取回模式与预计耗时，并将实际结果写入恢复操作手册。</div>
+
+      <h4>4.3.5 配置约束</h4>
+      <ul>
+        <li>正式桶和临时桶按本方案开启多 AZ 和版本控制，生产建桶前确认开启时机、可变更范围和关闭限制。</li>
+        <li>COS 版本控制和生命周期由存储桶配置管理，不在应用配置文件中设置；应用回收区由程序 GC 管理。</li>
+        <li>业务删除 COS 对象时不得指定版本 ID；指定版本 ID 会永久删除该版本。</li>
+        <li>对永久删除指定版本的控制台和 API 权限单独管理，不授予日常业务账号。</li>
+        <li>生命周期规则必须管理历史版本，而不是只管理当前版本。</li>
+        <li>生命周期规则需要同时配置历史版本到期删除和失效删除标记清理。</li>
+        <li>临时桶需要单独确认是否纳入 120 天恢复范围；不能假定正式桶的版本控制和生命周期自动作用于临时桶。</li>
+        <li>临时桶必须配置未完成分片上传的过期清理规则。</li>
+        <li>多 AZ、版本控制、存储类型和生命周期的开启条件、计费规则及可变更限制，需要在生产桶创建前根据当期腾讯云官方文档和控制台再次确认。</li>
+      </ul>
+
+      <h4>4.3.6 恢复目标与风险</h4>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>场景</th><th>处理方式</th><th>恢复目标</th></tr></thead>
+          <tbody>
+            <tr><td>单机房或单可用区故障</td><td>COS 多 AZ 自动处理</td><td>业务无需人工切换</td></tr>
+            <tr><td>误删除，仍在应用回收区</td><td>通过现有应用恢复能力恢复对象和文件记录</td><td>程序 GC 清理前恢复</td></tr>
+            <tr><td>应用回收记录已清理，历史版本尚未归档</td><td>运维恢复指定历史版本和业务记录</td><td>历史版本保留期内恢复</td></tr>
+            <tr><td>历史版本已经归档</td><td>先解冻历史版本，再恢复对象和业务记录</td><td>恢复时间取决于取回模式</td></tr>
+            <tr><td style="color:var(--danger);">北京地域 COS 整体不可用</td><td>等待腾讯云恢复</td><td style="color:var(--danger);">本期没有跨地域自主恢复能力</td></tr>
+            <tr><td>历史版本达到自身 120 天保留期</td><td>该历史版本已物理删除</td><td>无法通过该版本恢复</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>官方依据：
+        <a href="https://cloud.tencent.com/document/product/436/40548" target="_blank" rel="noopener">COS 多 AZ 特性概述</a> ·
+        <a href="https://cloud.tencent.com/document/product/436/19883" target="_blank" rel="noopener">COS 版本控制概述</a> ·
+        <a href="https://cloud.tencent.com/document/product/436/14605" target="_blank" rel="noopener">COS 配置生命周期</a> ·
+        <a href="https://cloud.tencent.com/document/product/436/33417" target="_blank" rel="noopener">COS 存储类型概述</a>
+      </p>
+    </section>
+
+    <!-- ============ 5 验证说明 ============ -->
+    <section id="sec5">
+      <h2 class="sec"><span class="num">05</span>验证说明</h2>
+      <div class="sec-rule"></div>
+
+      <h3>5.1 核心验证场景</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>场景</th><th>预期结果</th></tr></thead>
+          <tbody>
+            <tr><td>非灰度纷享销客存储客户上传</td><td>继续写入 FastDFS</td></tr>
+            <tr><td>灰度纷享销客存储客户上传</td><td>新文件写入 COS</td></tr>
+            <tr><td>数据专属客户上传</td><td>继续写入数据专属客户存储</td></tr>
+            <tr><td>灰度前的存量文件</td><td>继续从 FastDFS 读取</td></tr>
+            <tr><td>灰度后的新文件</td><td>从 COS 读取</td></tr>
+            <tr><td>客户退出灰度</td><td>新文件写 FastDFS，已有 COS 文件仍可读取</td></tr>
+            <tr><td>普通临时文件转正式</td><td>继承临时文件的存储体系，按源文件类型复制、复用或重新保存</td></tr>
+            <tr><td>图片临时文件转正式</td><td>图片处理后的文件继续写入原图所在的存储体系</td></tr>
+            <tr><td>临时上传后调整灰度名单</td><td>转正式仍沿用临时文件的实际存储体系</td></tr>
+            <tr><td>文件上传中调整灰度</td><td>已开始的上传继续在原存储完成</td></tr>
+            <tr><td>文件逻辑删除</td><td>文件对业务不可见，COS 对象不被立即删除</td></tr>
+            <tr><td>数据专属客户回归</td><td>上传、读取、转正式和删除保持原行为</td></tr>
+            <tr><td>文件进入应用回收区</td><td>回收对象和回收记录一致，原路径版本受 COS 保护</td></tr>
+            <tr><td>应用回收区恢复</td><td>对象和文件记录恢复到原位置，文件可正常访问</td></tr>
+            <tr><td>COS 历史版本恢复</td><td>指定历史版本和业务记录恢复正常</td></tr>
+            <tr><td>归档历史版本恢复</td><td>完成版本定位、解冻和业务记录恢复</td></tr>
+            <tr><td>失败分片上传清理</td><td>未完成分片在临时桶生命周期到期后被清理</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>5.2 验证内容</h3>
+      <p>每个场景需要同时确认：</p>
+      <ul>
+        <li>用户操作成功，文件内容正确。</li>
+        <li>文件记录包含足以定位目标存储和对象的信息。</li>
+        <li>文件大小、校验值和图片信息正确。</li>
+        <li>删除后没有误删共享文件，也没有异常残留增长。</li>
+        <li>日志能够定位实际访问的存储和失败原因。</li>
+        <li>服务错误率、响应时间和内存没有明显恶化。</li>
+      </ul>
+
+      <h3>5.3 当前验证状态</h3>
+      <p><strong>ceshi112 环境人工测试通过，文件存储改造的自动化核心场景测试通过。</strong></p>
+      <div class="status-grid">
+        <div class="status-box done">
+          <h4>已完成</h4>
+          <ul>
+            <li>ceshi112 环境人工测试通过。</li>
+            <li>文件存储改造的自动化核心场景测试通过。</li>
+            <li>新文件三类写入目标、已有文件读取及分片上传验证。</li>
+            <li>普通上传与分片开始使用同一存储选择规则。</li>
+            <li>分片开始后调整灰度名单，后续仍按原存储完成。</li>
+            <li>对象存储配置更新和下载期间配置保护。</li>
+          </ul>
+        </div>
+        <div class="status-box todo">
+          <h4>上线前待完成</h4>
+          <ul>
+            <li>生产 COS 配置完整性核对及生产流量导入前的冒烟验证。</li>
+            <li>暂停灰度后的混合读取和数据专属客户回归。</li>
+            <li>正式桶、临时桶、版本控制和生命周期配置核对。</li>
+            <li>应用回收区、COS 历史版本和归档版本恢复演练。</li>
+            <li>全量下载、范围下载的日志、指标与告警验证。</li>
+            <li>SET 路由与存储切换企业集合一致性检查。</li>
+            <li>填写各阶段阈值、观察时长和停止放量条件。</li>
+          </ul>
+        </div>
+      </div>
+      <figure>
+        <img src="assets/automated-test-report-20260720.png" alt="2026 年 7 月 20 日自动化核心场景测试报告">
+        <figcaption>自动化测试报告 · 2026-07-20 21:00 · 645 个测试用例 · 报告显示 99.16% · 文件存储改造核心场景通过</figcaption>
+      </figure>
+      <div class="note">生产灰度以真实 COS 端到端结果和恢复演练作为准入依据，单元测试结果不单独作为放量依据。</div>
+
+      <h3>5.4 灰度通过标准</h3>
+      <ul>
+        <li>开启 COS 灰度前，非灰度 FastDFS 企业和数据专属客户的上传、读取、预览、转正式和删除保持正常。</li>
+        <li>所有核心业务场景通过。</li>
+        <li>文件记录可以准确定位对应存储和对象。</li>
+        <li>暂停灰度后，新文件恢复写入 FastDFS。</li>
+        <li>暂停灰度后，已有 COS 文件仍可正常读取和管理。</li>
+        <li>数据专属客户没有行为变化。</li>
+        <li>完成应用回收区、COS 历史版本和归档恢复演练。</li>
+        <li>SET 路由与存储切换两处企业集合完全一致。</li>
+        <li>北京地域整体不可用时无跨地域恢复能力的风险获得评审确认。</li>
+        <li>错误率、响应时间、内存和观察时长阈值明确并满足要求。</li>
+        <li>暂停灰度、恢复和回滚决策责任人明确。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 6 回滚方案 ============ -->
+    <section id="sec6">
+      <h2 class="sec"><span class="num">06</span>回滚方案</h2>
+      <div class="sec-rule"></div>
+
+      <h3>6.1 回滚原则</h3>
+      <p>本方案不建设 COS 到 FastDFS 的数据回迁能力。回滚只停止后续新文件写入 COS，不会改变已经写入 COS 的文件位置。已经产生 COS 数据后，必须继续保留对象存储读取和管理能力。</p>
+      <div class="note"><strong>回滚能力边界：</strong>本方案中的“回滚”是关闭灰度、停止新增 COS 写入，不等于将服务回滚到任意旧版本。一旦产生 COS 文件，就不能回滚到不支持 COS 读取的旧版本；服务必须继续运行同时支持 FastDFS、COS 和数据专属客户存储的版本。</div>
+      <p><strong>新代码上线后、开启 COS 灰度前，必须优先验证两类非灰度请求：</strong></p>
+      <ol>
+        <li>非灰度纷享销客存储企业的上传、读取、预览、转正式和删除继续使用 FastDFS，业务结果正常。</li>
+        <li>数据专属客户的上传、读取、预览、转正式和删除继续使用原有数据专属存储，业务结果正常。</li>
+      </ol>
+      <p>两类请求验证通过后才能开启 COS 灰度。这是本方案能够通过关闭灰度控制新增影响的前提。</p>
+      <div class="level-grid">
+        <div class="level-card l1">
+          <div class="level-tag">LEVEL 1</div>
+          <div class="level-name">停止扩大范围</div>
+          <div class="level-scene">指标有波动但核心功能可用</div>
+          <div class="level-do">不再增加灰度客户，继续观察</div>
+        </div>
+        <div class="level-card l2">
+          <div class="level-tag">LEVEL 2</div>
+          <div class="level-name">暂停新写入 COS</div>
+          <div class="level-scene">COS 写入或性能异常</div>
+          <div class="level-do">关闭灰度，新文件恢复写 FastDFS</div>
+        </div>
+      </div>
+
+      <h3>6.2 尚未产生 COS 数据</h3>
+      <p>如果灰度尚未开启，或者确认没有产生任何 COS 文件，可以直接关闭灰度并回滚应用版本。此时不存在依赖新代码读取的纷享销客 COS 文件。</p>
+
+      <h3>6.3 已经产生 COS 数据</h3>
+      <p>先执行二级回滚：</p>
+      <ol>
+        <li>关闭灰度，新文件恢复写入 FastDFS。</li>
+        <li>保留现有 COS 读取能力和对象存储配置。</li>
+        <li>验证已有 COS 文件继续可读、可删除、可转正式。</li>
+        <li>继续保留 FastDFS 与 COS 混合存储，不迁移已有 COS 文件。</li>
+      </ol>
+      <div class="note">此时不能直接回滚到不支持 COS 读取的旧版本，否则已经写入 COS 的文件会无法访问。</div>
+
+      <h3>6.4 回滚触发条件</h3>
+      <p>出现以下情况时暂停灰度并评估回滚：</p>
+      <ul>
+        <li>上传、读取、复制或删除错误率持续超过阈值。</li>
+        <li>服务内存、GC、超时明显恶化。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 7 风险评估及应对措施 ============ -->
+    <section id="sec7">
+      <h2 class="sec"><span class="num">07</span>风险评估及应对措施</h2>
+      <div class="sec-rule"></div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>风险</th><th>可能表现</th><th>应对措施</th></tr></thead>
+          <tbody>
+            <tr><td>文件操作异常</td><td>上传、下载、预览、转正式或删除出现异常。这类问题表现直接，通常会在测试或小范围灰度阶段暴露</td><td>完成人工测试和自动化测试；按测试企业、FS 流量、真实企业逐步放量；发现异常立即关闭灰度</td></tr>
+            <tr><td>生产流量下性能波动</td><td>测试环境无法完全模拟生产请求量，放量后可能出现响应时间增加、内存或 CPU 上升</td><td>每批保留观察时间，关注错误日志、Tomcat 响应时间和失败数量、服务内存和 CPU；指标异常时停止放量</td></tr>
+            <tr><td>服务版本无法完全回滚</td><td>产生 COS 文件后，不能回滚到不支持 COS 读取的旧版本</td><td>开启灰度前优先验证非灰度 FastDFS 企业和数据专属客户；异常时关闭灰度，新文件恢复写入 FastDFS，已有 COS 文件继续由新版本读取</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>文件存储灰度切换方案评审汇报 · 纷享销客存储体系</span>
+      <span>FastDFS → COS · 单写灰度 · 2026-07</span>
+    </footer>
+  </main>
+</div>
+
+<!-- 灯箱 -->
+<div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""></div>
+
+<script>
+// 主题切换
+(function () {
+  var saved = localStorage.getItem('review-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+    document.documentElement.setAttribute('data-theme', 'dark');
+  document.getElementById('themeBtn').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('review-theme', next);
+  });
+})();
+// 目录滚动定位
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) map[id] = a;
+  });
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (a) { a.classList.remove('active'); });
+        var a = map[e.target.id];
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -75% 0px' });
+  Object.keys(map).forEach(function (id) { obs.observe(document.getElementById(id)); });
+})();
+// 图片灯箱
+(function () {
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lightboxImg');
+  document.querySelectorAll('figure img').forEach(function (img) {
+    img.addEventListener('click', function () {
+      lbImg.src = img.src;
+      lb.classList.add('open');
+    });
+  });
+  lb.addEventListener('click', function () { lb.classList.remove('open'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') lb.classList.remove('open');
+  });
+})();
+</script>
+</body>
+</html>
