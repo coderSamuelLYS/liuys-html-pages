@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>文件服务代码发布 · Stone Cloud Briefing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/cloud-briefing.css" />
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="brand" href="release.html">
+      <span class="brand-mark">STONE</span>
+      <span class="brand-sub">Cloud Briefing</span>
+    </a>
+    <div class="nav-links">
+      <a class="is-current" href="release.html">代码发布</a>
+      <a href="storage.html">存储改造</a>
+      <a href="index.html">评审基线</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero-date">08.14<small>— 08.22</small></div>
+    <div>
+      <p class="kicker">File Service · Release Dossier</p>
+      <h1>代码发布与操作手册</h1>
+      <p class="hero-lead">把发布方案和操作步骤合成一份执行页。14 日前把 gray 代码发完；14 日起只导流量。21 日发 <code>foneshare</code>，22 日专项环境。23 日起 COS 名单才允许从 deny 改成 white。</p>
+    </div>
+    <dl class="hero-meta">
+      <dt>Tag</dt><dd>v0711-master-set-20260813</dd>
+      <dt>Cluster</dt><dd>tke70-k8s1</dd>
+      <dt>Branch</dt><dd>master-set · a6d2f27c4</dd>
+      <dt>Order</dt><dd>cloud → metaserver → fileserver → proxy</dd>
+    </dl>
+  </header>
+
+  <div class="ribbon">
+    <a href="#baseline"><span class="kicker">00 基线</span><strong>同一条 tag</strong></a>
+    <a href="#schedule"><span class="kicker">01 排期</span><strong>流量 + 名单</strong></a>
+    <a href="#gray"><span class="kicker">02 Gray</span><strong>14 日前发代码</strong></a>
+    <a href="#prod"><span class="kicker">03 正式</span><strong>21 日先配再建</strong></a>
+    <a href="#special"><span class="kicker">04 专项</span><strong>yqsl / haoliyou</strong></a>
+  </div>
+
+  <div class="layout">
+    <nav class="toc">
+      <a href="#baseline">基线</a>
+      <a href="#schedule">发布排期</a>
+      <a href="#gray">foneshare-gray</a>
+      <a href="#prod">foneshare</a>
+      <a href="#special">专项环境</a>
+      <a href="#verify">验证与回退</a>
+    </nav>
+    <article class="main">
+
+      <section class="section" id="baseline">
+        <div class="section-index">01</div>
+        <p class="kicker">Release Baseline</p>
+        <h2>发布基线</h2>
+        <p>仓库 <code>https://git.firstshare.cn/BizCommon/fs-stone.git</code>。发布系统填 tag，不填分支名。父 POM <code>fxiaoke-parent-pom-20260711</code>，编译镜像 <code>reg.foneshare.cn/base/fs-maven3.9:openjdk8</code>。现有 <code>v0711-master-set-20260807</code>、<code>v0711-master-set-20260725</code> 都不能当最新。工作区未提交的 COS 路由改动默认不进本次 tag。</p>
+        <div class="cards">
+          <div class="card"><div class="n">01</div><h3>foneshare-gray</h3><p>14 日前发完四个服务。14 日只导 FS 和第一批小微。配置不改。</p></div>
+          <div class="card"><div class="n">02</div><h3>foneshare</h3><p>21 日全网进 gray 后，先新建 <code>fs-stone-cloud-storage</code>，再发同一 tag。</p></div>
+          <div class="card"><div class="n">03</div><h3>专项</h3><p>22 日 yqsl 发四个服务；haoliyou 发 metaserver、fileserver。写入灰度仍是 deny。</p></div>
+        </div>
+        <p>九仓独立子用户这次继续用 gray 现网密文。yqsl 租户都是数据专属，写入走 <code>fs-stone-enterprise-cloud-toml</code>。haoliyou 后续迁 COS，本次先把读取链路升上去。</p>
+        <div class="people">
+          <div><span class="kicker">操作</span><b>刘云松</b></div>
+          <div><span class="kicker">验证 / 观测</span><b>刘云松、安宜龙</b></div>
+        </div>
+      </section>
+
+      <section class="section" id="schedule">
+        <div class="section-index">02</div>
+        <p class="kicker">Timeline</p>
+        <h2>发布排期</h2>
+        <p>配置位置：<code>fs-gray-file-system</code> / profile <code>foneshare</code> / <code>stone-cloud-write-v2</code>。14–22 日保持 deny。26 日名单以 <code>white:fs|</code> 开头，若测试企业仍在灰度中，在 <code>white:</code> 后补 <code>&lt;测试EA&gt;|</code>。31 日至 9 月 4 日不得写 <code>white:%40</code>。</p>
+        <figure class="figure">
+          <img src="assets/file-service-release-strategy-0814-0822.png" alt="文件服务发布与 SET 化流量策略" />
+        </figure>
+        <p class="figure-cap">SET 流量策略 · 8 月 14 日 — 22 日　<a href="assets/file-service-release-strategy-0814-0822.drawio">Draw.io</a></p>
+
+        <div class="day">
+          <div class="day-date">14<span>导流量</span></div>
+          <div>
+            <span class="badge deny">deny</span>
+            <p>FS + 第一批小微导入 <code>foneshare-gray</code>。gray 代码必须已经在跑。导入后立刻自动化和人工验证。</p>
+            <div class="panel">
+              <div class="panel-head">当天配置 <button class="copy" data-copy="#cfg-deny" type="button">复制</button></div>
+              <pre id="cfg-deny">stone-cloud-write-v2=deny</pre>
+            </div>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">15<span>40%</span></div>
+          <div>
+            <span class="badge deny">deny</span>
+            <p>先给 gray 扩容，再把 SET 扩大到 40%。tag 和配置不动。</p>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">16<span>60%</span></div>
+          <div>
+            <span class="badge deny">deny</span>
+            <p>SET 扩大到 60%。观察达标才能进 21 日全网。</p>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">21<span>全网 + 正式</span></div>
+          <div>
+            <span class="badge deny">deny</span>
+            <p>上午全网进 gray。验证通过后新建九仓配置，发布 <code>foneshare</code>，再回流 40%，gray 不缩容，观察一天。</p>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">22<span>回流 + 专项</span></div>
+          <div>
+            <span class="badge deny">deny</span>
+            <p>剩余流量回 <code>foneshare</code>。yqsl、haoliyou 流量临时导入正式环境，发布后再分别导回。代码验收不过，COS 扩灰整体顺延。</p>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">23<span>测试企业 + FS</span></div>
+          <div>
+            <span class="badge white">white</span>
+            <p>先 <code>white:&lt;测试EA&gt;</code>，通过后再加 <code>|fs</code>。</p>
+            <div class="panel">
+              <div class="panel-head">测试企业 <button class="copy" data-copy="#cfg-23a" type="button">复制</button></div>
+              <pre id="cfg-23a">stone-cloud-write-v2=white:&lt;测试EA&gt;</pre>
+            </div>
+            <div class="panel">
+              <div class="panel-head">测试企业 + FS <button class="copy" data-copy="#cfg-23b" type="button">复制</button></div>
+              <pre id="cfg-23b">stone-cloud-write-v2=white:&lt;测试EA&gt;|fs</pre>
+            </div>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">26<span>100 小微</span></div>
+          <div>
+            <span class="badge white">white</span>
+            <p>fast02 / fast04 在用小微 100 家 + FS。若测试企业还在，粘贴前插入 <code>&lt;测试EA&gt;|</code>。</p>
+            <div class="panel">
+              <div class="panel-head">8 月 26 日 <button class="copy" data-copy="#cfg-26" type="button">复制</button></div>
+              <pre id="cfg-26">stone-cloud-write-v2=white:fs|060080|159329|159626|159800|160822|164767|205205|207601|282370|293266|308582|308677|313283|318000|326338|332267|337871|338691|339348|341590|350109|350541|351527|355951|359857|361912|363227|364637|373077|373838|380282|384175|399637|40000091|40000099|40000103|40000135|40040086|40160046|40160054|40160097|40160129|40160157|40160169|40160181|40160196|40160208|40160228|40160232|40160252|090278|156107|156681|159551|161711|167042|176512|178121|185166|201819|218217|227270|233159|249770|258930|267618|268439|282489|298291|302412|304545|310801|312383|329548|337577|352222|353127|353149|353939|354584|356777|359384|361111|362718|367530|368227|368507|369927|370717|373076|374132|374664|375384|376207|377151|377239|378331|379662|380163|381081</pre>
+            </div>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">28<span>两分区非 VIP</span></div>
+          <div>
+            <span class="badge white">white</span>
+            <p>fast02 / fast04 全部在用非 VIP、非 SVIP，约 1.7 万 EA，打开 ini 整行复制。</p>
+            <p><a href="assets/gray-lists/02-0828-white-fs-plus-fast02-fast04-non-vip.ini">02-0828-white-fs-plus-fast02-fast04-non-vip.ini</a></p>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">31–04<span>其他分区</span></div>
+          <div>
+            <p>累计 40% / 60% / 全部非 VIP。当前 CSV 只有 Fast02/Fast04，其他分区名单未出。未出名单前不要 <code>allow</code>。</p>
+          </div>
+        </div>
+        <div class="day">
+          <div class="day-date">09.06<span>VIP / 全网</span></div>
+          <div>
+            <span class="badge white">white</span>
+            <span class="badge allow">allow</span>
+            <p>只开 Fast02/Fast04 时用全量 normal 名单；其他分区一并放开时用 allow。</p>
+            <p><a href="assets/gray-lists/03-0906-white-fs-plus-fast02-fast04-all-normal.ini">03-0906 Fast02/Fast04 全量</a></p>
+            <div class="panel">
+              <div class="panel-head">全网 <button class="copy" data-copy="#cfg-allow" type="button">复制</button></div>
+              <pre id="cfg-allow">stone-cloud-write-v2=allow</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="gray">
+        <div class="section-index">03</div>
+        <p class="kicker">Namespace · foneshare-gray</p>
+        <h2>先发 gray</h2>
+        <p>14 日前发代码，14 日只导流量。配置不改。proxy 发布后按实际运行 4 恢复，不要缩到配置值 2。</p>
+        <table>
+          <thead><tr><th>服务</th><th>当前 tag</th><th>commit</th><th>副本</th><th>发到</th></tr></thead>
+          <tbody>
+            <tr><td><code>fs-stone-cloud</code></td><td>v0711-master-dec-cloud-20260725</td><td>96c15ee</td><td>2/2</td><td>v0711-master-set-20260813</td></tr>
+            <tr><td><code>fs-stone-metaserver</code></td><td>v0711-master-set-20260725</td><td>0cad1ab</td><td>2/2</td><td>v0711-master-set-20260813</td></tr>
+            <tr><td><code>fs-stone-fileserver</code></td><td>v0711-master-set-20260725</td><td>0cad1ab</td><td>2/2</td><td>v0711-master-set-20260813</td></tr>
+            <tr><td><code>fs-stone-proxy</code></td><td>v965-unify-multi-cluster-new-mq-retry</td><td>e378572</td><td>2/4</td><td>v0711-master-set-20260813</td></tr>
+          </tbody>
+        </table>
+        <h3>14 日前 · 发代码</h3>
+        <ol class="steps">
+          <li>发布系统选 namespace <code>foneshare-gray</code>，集群 <code>tke70-k8s1</code>。</li>
+          <li>四个应用填 tag <code>v0711-master-set-20260813</code>，按 cloud → metaserver → fileserver → proxy 发布。</li>
+          <li>确认四个应用都是这个 tag，Pod Running。</li>
+          <li>gray 入口验证：普通上传、临时转正式、历史 FastDFS 下载、分片/复制/删除、数据专属仍走原存储。普通企业新文件没有写入 COS。</li>
+        </ol>
+        <h3>14 日 · 导第一批流量</h3>
+        <ol class="steps">
+          <li>改 SET：FS + 第一批小微切到 <code>foneshare-gray</code>。</li>
+          <li>服务 tag 不动，配置不动。导入后立刻自动化 + 人工验证。</li>
+        </ol>
+        <h3>15 / 16 / 21 日上午</h3>
+        <ol class="steps">
+          <li>15 日先扩容 gray，再扩到 40%。</li>
+          <li>16 日扩到 60%。</li>
+          <li>21 日上午确认容量后全网切 gray，再验 FastDFS 企业和数据专属。</li>
+        </ol>
+        <p class="note">每次放量前在发布单填写错误率、响应时间、内存、CPU、观察时长和停止条件。空着不准进入下一节点。异常时停止扩大，受影响企业迁回 <code>foneshare</code>。</p>
+        <h3>回退</h3>
+        <p>还没导生产流量：四个服务回退到上表旧 tag。已经在吃流量：停止扩大 SET，把受影响企业迁回正式环境。已经产生 COS 文件后，不能回退到不支持 COS 读取的旧版本。</p>
+      </section>
+
+      <section class="section" id="prod">
+        <div class="section-index">04</div>
+        <p class="kicker">Namespace · foneshare</p>
+        <h2>21 日发正式环境</h2>
+        <p>等 gray 全网承接并验证通过。必须在发 <code>fs-stone-cloud</code> 之前新建 <code>fs-stone-cloud-storage</code>（2026-08-13 查正式环境是 404）。不要改 gray 那份。发布后副本：cloud 10、metaserver 9、fileserver 12、proxy 7。</p>
+        <table>
+          <thead><tr><th>服务</th><th>当前 tag</th><th>commit</th><th>副本</th><th>发到</th></tr></thead>
+          <tbody>
+            <tr><td><code>fs-stone-cloud</code></td><td>v1.8.1-unify-20260121-mq-retry</td><td>cfee4c4</td><td>10/10</td><td>同一 tag</td></tr>
+            <tr><td><code>fs-stone-metaserver</code></td><td>v985-910fix-20260126-mq-retry</td><td>f343fce</td><td>9/9</td><td>同一 tag</td></tr>
+            <tr><td><code>fs-stone-fileserver</code></td><td>v985-910fix-20260126-mq-retry</td><td>f343fce</td><td>12/12</td><td>同一 tag</td></tr>
+            <tr><td><code>fs-stone-proxy</code></td><td>v985-910fix-20260126-mq-retry</td><td>f343fce</td><td>7/7</td><td>同一 tag</td></tr>
+          </tbody>
+        </table>
+        <p>配置名 <code>fs-stone-cloud-storage</code>，profile <code>foneshare</code>，正文来自 gray 现网同一份：生产桶名、内网 endpoint、配置中心密文。</p>
+        <div class="panel">
+          <div class="panel-head">fs-stone-cloud-storage · TOML 整段粘贴 <button class="copy" data-copy="#cfg-toml" type="button">复制</button></div>
+          <pre id="cfg-toml">[warehouse01]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-01-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-01-1251989944"
+pathStyleAccess = false
+
+[warehouse02]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-02-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-02-1251989944"
+pathStyleAccess = false
+
+[warehouse03]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-03-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-03-1251989944"
+pathStyleAccess = false
+
+[warehouse04]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-04-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-04-1251989944"
+pathStyleAccess = false
+
+[warehouse05]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-05-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-05-1251989944"
+pathStyleAccess = false
+
+[warehouse06]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-06-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-06-1251989944"
+pathStyleAccess = false
+
+[warehouse07]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-07-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-07-1251989944"
+pathStyleAccess = false
+
+[warehouse08]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-08-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-08-1251989944"
+pathStyleAccess = false
+
+[warehouse09]
+endpoint = "https://cos-internal.ap-beijing.myqcloud.com"
+region = "ap-beijing"
+accessKey = "6727AB27703170DA0E1A8C70B46EF961E6A06E6B38AAE8B392BC05FFCCAB58581A71D5C9902182C28635F8FB416F131D"
+secretKey = "FBD7E95C3CC3F81346161F5A7F7C468F797E75C84DCAA35448BFC9432EE92F87B1109907F49752836E8B21312283C6A9"
+bucket = "fs-pcf-warehouse-09-1251989944"
+tempBucket = "fs-pcf-temp-warehouse-09-1251989944"
+pathStyleAccess = false</pre>
+        </div>
+        <p>发布配置后用 profile <code>foneshare</code> 再拉一次，应是 HTTP 200，九个 section 都在。<code>stone-cloud-write-v2</code> 当天仍是 deny。</p>
+        <h3>先改配置，再发代码</h3>
+        <ol class="steps">
+          <li>确认全网流量已经在 gray，验证通过。</li>
+          <li>配置中心新建 <code>fs-stone-cloud-storage</code>，把上面 TOML 整段粘贴并发布。</li>
+          <li>打开 <code>fs-gray-file-system</code> 确认仍是 deny。</li>
+          <li>发布系统选 namespace <code>foneshare</code>，四个应用填 gray 已在跑的同一个 tag，按顺序发布。</li>
+          <li>确认 tag、Pod Running、副本回到生产规模。</li>
+        </ol>
+        <h3>发布后验证，再回流</h3>
+        <ol class="steps">
+          <li>立刻跑自动化和人工测试。任一失败：流量继续留 gray。</li>
+          <li>通过后把 40% 从 gray 导回 <code>foneshare</code>，观察一天，gray 不缩容。</li>
+          <li>22 日观察达标后，剩余流量全部导回，再把两个专项环境流量临时导入正式环境。</li>
+        </ol>
+      </section>
+
+      <section class="section" id="special">
+        <div class="section-index">05</div>
+        <p class="kicker">22 Aug</p>
+        <h2>专项环境</h2>
+        <h3>foneshare-yqsl</h3>
+        <p>租户都是数据专属。配置不改，继承 21 日在 <code>foneshare</code> 建好的九仓。验证只看数据专属读写仍走 <code>fs-stone-enterprise-cloud-toml</code>。</p>
+        <table>
+          <thead><tr><th>服务</th><th>当前 tag</th><th>commit</th><th>副本</th></tr></thead>
+          <tbody>
+            <tr><td><code>fs-stone-cloud</code></td><td>v1.8.1-unify-20260121-mq-retry</td><td>cfee4c4</td><td>8/8</td></tr>
+            <tr><td><code>fs-stone-metaserver</code></td><td>v965-unify-multi-cluster-new-mq-retry</td><td>e378572</td><td>4/4</td></tr>
+            <tr><td><code>fs-stone-fileserver</code></td><td>v965-unify-multi-cluster-new-mq-retry</td><td>e378572</td><td>4/4</td></tr>
+            <tr><td><code>fs-stone-proxy</code></td><td>v965-unify-multi-cluster-new-mq-retry</td><td>e378572</td><td>4/4</td></tr>
+          </tbody>
+        </table>
+        <ol class="steps">
+          <li>提前一周提交审批，通知快消 QA。</li>
+          <li>当天先把流量临时导入 <code>foneshare</code>。</li>
+          <li>发布系统选 <code>foneshare-yqsl</code>，四个应用填同一 tag，按顺序发布。</li>
+          <li>自动化 + 快消 QA 都通过后，流量导回。</li>
+        </ol>
+        <p class="note">发布前失败不发；发布后自动化失败不导回；快消 QA 失败停止回迁；导回后异常再迁回 <code>foneshare</code>。</p>
+        <h3>foneshare-haoliyou</h3>
+        <p>后续迁 COS。本次发 metaserver、fileserver。COS 对象访问走 fileserver 指向的 cloud，回退链用 21 日正式环境那份九仓。</p>
+        <table>
+          <thead><tr><th>服务</th><th>当前 tag</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>fs-stone-metaserver</code></td><td>v985-910fix-20260126-mq-retry</td><td>COS 元数据 / warehouse 持久化</td></tr>
+            <tr><td><code>fs-stone-fileserver</code></td><td>v985-910fix-20260126-mq-retry</td><td>COS 读写路由</td></tr>
+          </tbody>
+        </table>
+        <ol class="steps">
+          <li>和 yqsl 同一天、同一套审批，先把流量临时导入 <code>foneshare</code>。</li>
+          <li>选 namespace <code>foneshare-haoliyou</code>，发 metaserver、fileserver，填同一 tag。</li>
+          <li>自动化 + 快消 QA 通过后导回。验证老存储读写仍正常。</li>
+        </ol>
+      </section>
+
+      <section class="section" id="verify">
+        <div class="section-index">06</div>
+        <p class="kicker">Gate</p>
+        <h2>验证、完成、回退</h2>
+        <h3>核心业务</h3>
+        <p>FastDFS 企业上传、读取、预览、临时转正式、分片、删除正常。数据专属保持原行为。已有 FastDFS、纷享销客 COS、数据专属文件均可读取。访问地址和文件记录定位正确。</p>
+        <h3>服务指标</h3>
+        <p>错误率、错误日志、Tomcat 响应时间与失败数量、内存和 CPU 满足发布单阈值。gray 与正式环境容量满足当前流量。</p>
+        <h3>完成标准</h3>
+        <p><code>foneshare</code> 全量承接新代码；两个专项环境验证通过且流量已导回；自动化和人工测试通过；各节点观察时长和验收结果已写入发布单；确认无需回退前 gray 继续保留。</p>
+        <h3>回退边界</h3>
+        <p>gray 阶段异常：停止扩大，受影响企业迁回正式环境。<code>foneshare</code> 发布或配置失败：全量留 gray。自动化未通过：不回流。部分回流后异常：再迁回 gray。代码发布回退只处理环境和流量路由，不迁移文件。COS 扩灰开始后的暂停按<a href="storage.html">存储改造</a>执行。</p>
+      </section>
+    </article>
+  </div>
+
+  <footer class="site-foot">
+    <span>Stone · File Cloud</span>
+    <span>合成自发布方案 / 操作手册 · 2026</span>
+  </footer>
+  <script src="assets/cloud-briefing.js"></script>
+</body>
+</html>

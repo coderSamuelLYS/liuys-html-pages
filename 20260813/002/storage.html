@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>文件服务存储改造 · Stone Cloud Briefing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/cloud-briefing.css" />
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="brand" href="release.html">
+      <span class="brand-mark">STONE</span>
+      <span class="brand-sub">Cloud Briefing</span>
+    </a>
+    <div class="nav-links">
+      <a href="release.html">代码发布</a>
+      <a class="is-current" href="storage.html">存储改造</a>
+      <a href="index.html">评审基线</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero-date">08.23<small>— 09.06</small></div>
+    <div>
+      <p class="kicker">File Service · Storage Architecture</p>
+      <h1>存储改造方案</h1>
+      <p class="hero-lead">纷享销客存储保留 FastDFS，按企业把新文件写入切到 COS。存量不迁，不双写。数据专属客户不进这次灰度。当天要粘贴的名单只在<a href="release.html#schedule">代码发布排期</a>。</p>
+    </div>
+    <dl class="hero-meta">
+      <dt>Write</dt><dd>单写 · 不双写</dd>
+      <dt>Read</dt><dd>objectKey 非空走 Cloud</dd>
+      <dt>Warehouses</dt><dd>01–09 · 18 桶</dd>
+      <dt>Gate</dt><dd>代码发布验收之后</dd>
+    </dl>
+  </header>
+
+  <div class="ribbon">
+    <a href="#goal"><span class="kicker">01</span><strong>原则</strong></a>
+    <a href="#arch"><span class="kicker">02</span><strong>路由</strong></a>
+    <a href="#rollout"><span class="kicker">03</span><strong>扩灰</strong></a>
+    <a href="#verify"><span class="kicker">04</span><strong>验证</strong></a>
+    <a href="#protect"><span class="kicker">05</span><strong>保护</strong></a>
+  </div>
+
+  <div class="layout">
+    <nav class="toc">
+      <a href="#goal">目标与原则</a>
+      <a href="#arch">存储架构</a>
+      <a href="#biz">业务链路</a>
+      <a href="#ready">上线准备</a>
+      <a href="#rollout">COS 扩灰</a>
+      <a href="#verify">验证</a>
+      <a href="#rollback">暂停与回退</a>
+      <a href="#protect">数据保护</a>
+      <a href="#risk">风险与待办</a>
+    </nav>
+    <article class="main">
+
+      <section class="section" id="goal">
+        <div class="section-index">01</div>
+        <p class="kicker">Principles</p>
+        <h2>目标与原则</h2>
+        <div class="cards">
+          <div class="card"><div class="n">I</div><h3>单写</h3><p>新文件只写一个目标。双写要缓存、复制、两套失败处理，部分成功会不一致。</p></div>
+          <div class="card"><div class="n">II</div><h3>不迁存量</h3><p>FastDFS 文件留在原地。退出灰度后新文件回 FastDFS，已有 COS 文件不回写、不删。</p></div>
+          <div class="card"><div class="n">III</div><h3>专属优先</h3><p>同时命中数据专属和 COS 名单时，走数据专属，不进纷享销客 COS。</p></div>
+        </div>
+        <table>
+          <thead><tr><th>对比</th><th>变更前</th><th>变更后</th></tr></thead>
+          <tbody>
+            <tr><td>纷享销客存储</td><td>新文件写 FastDFS</td><td>按企业选择 FastDFS 或 COS</td></tr>
+            <tr><td>数据专属</td><td>客户独立存储</td><td>保持原方式</td></tr>
+            <tr><td>存量文件</td><td>从原存储读</td><td>继续从原存储读</td></tr>
+            <tr><td>读取</td><td>按原记录</td><td><code>objectKey</code> 非空进 Cloud，否则 FastDFS</td></tr>
+          </tbody>
+        </table>
+        <p>业务接口不变：上传、下载、预览、临时转正式、分片、删除对业务侧无感知。读取、复制、转正式、删除靠文件记录里的 <code>objectKey</code> 区分通道，不看当前 COS 名单，也不读 <code>storageType</code>。</p>
+      </section>
+
+      <section class="section" id="arch">
+        <div class="section-index">02</div>
+        <p class="kicker">Routing</p>
+        <h2>存储架构</h2>
+        <figure class="figure">
+          <img src="assets/file-storage-routing-architecture.svg" alt="文件服务存储总体架构" />
+        </figure>
+        <p class="figure-cap">写入与读取路由　<a href="assets/file-storage-routing-architecture.drawio">Draw.io</a></p>
+        <h3>写入顺序</h3>
+        <p><code>StorageServerProxy.isCloudStorage(ea)</code> 选唯一目标：</p>
+        <ol class="steps">
+          <li>数据专属客户 → 数据专属存储。</li>
+          <li>纷享销客企业命中 COS 名单 → COS。</li>
+          <li>其余纷享销客企业 → FastDFS。</li>
+        </ol>
+        <p>COS 记录保存 <code>bucket</code>、<code>objectKey</code>、<code>cloudType</code>。FastDFS 记录保存 <code>trackerGroup</code>、<code>group</code>、<code>masterId</code>、<code>storageAddress</code>。进入 Cloud 后，<code>CloudFileServiceProxy</code> 再按当前数据专属属性选择专属存储或纷享销客 COS。<code>cloudType</code> 只做元数据标记。</p>
+        <h3>九套分区</h3>
+        <p><code>FsCosBucketRouter</code> 按 <code>enterpriseId</code> 在 <code>warehouse01</code>–<code>warehouse09</code> 做一致性哈希，再按生命周期选正式桶或临时桶。每套两个物理桶、独立子用户，权限只覆盖本套两个桶。先定哪一套，再定正式/临时。<code>tempFile</code> 表示业务生命周期，不用于选套。</p>
+      </section>
+
+      <section class="section" id="biz">
+        <div class="section-index">03</div>
+        <p class="kicker">Business Path</p>
+        <h2>核心业务链路</h2>
+        <table>
+          <thead><tr><th>操作</th><th>改造后</th><th>感知</th></tr></thead>
+          <tbody>
+            <tr><td>普通上传</td><td>先定存储体系，再选唯一写入目标</td><td>无</td></tr>
+            <tr><td>下载 / 预览</td><td><code>objectKey</code> 非空进 Cloud</td><td>无</td></tr>
+            <tr><td>临时转正式</td><td>继承源文件通道，不按当时名单改体系</td><td>无</td></tr>
+            <tr><td>分片上传</td><td>开始时定目标，后续动作保持一致</td><td>无</td></tr>
+            <tr><td>删除 / 恢复</td><td>先逻辑删除和应用回收，再靠 COS 版本控制延时保护</td><td>无</td></tr>
+          </tbody>
+        </table>
+        <p>纷享销客 COS 转正式：同一套配置内从临时桶复制到正式桶。FastDFS：满足条件则复用原物理文件，否则读临时文件再保存。需要图片处理的，新文件仍写原图所在体系。</p>
+        <p>分片进行中改名单，已开始的文件仍在原目标完成。临时桶必须配置未完成分片过期清理。多记录引用同一对象时，有其他引用就不处理物理对象。</p>
+        <table>
+          <thead><tr><th>场景</th><th>读取</th></tr></thead>
+          <tbody>
+            <tr><td>存量 FastDFS</td><td>继续 FastDFS</td></tr>
+            <tr><td>新增 COS</td><td>按记录进 COS</td></tr>
+            <tr><td>数据专属</td><td>按客户原配置</td></tr>
+            <tr><td>退出灰度</td><td>新文件写 FastDFS，已有 COS 继续从 COS 读</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="ready">
+        <div class="section-index">04</div>
+        <p class="kicker">Preconditions</p>
+        <h2>资源与上线准备</h2>
+        <p>启动条件：<a href="release.html">代码发布</a>已验收；<code>foneshare</code>、yqsl、haoliyou 已发布并回迁流量；FastDFS 与数据专属核心业务通过；后续真实企业都由支持 COS 读写的新代码处理。COS 名单和代码流量名单分开管。</p>
+        <h3>测试企业开启前</h3>
+        <ol class="steps">
+          <li>九套配置、正式桶、临时桶全部创建完成。</li>
+          <li>地域、多 AZ、网络、代理、访问地址、warehouse 路由正确。</li>
+          <li>九个独立子用户，每个只能访问本分区两个桶。</li>
+          <li>正式桶和临时桶开启版本控制；非当前版本 1 天转低频、60 天删除。</li>
+          <li>临时桶配置未完成分片过期清理。</li>
+        </ol>
+        <p class="note">评审基线记录资源已准备，生产子用户权限仍需完成。现场以发布单核对结果为准。任一准入字段未填、上一节点未到观察时长、业务失败或超阈值，不得进入下一节点。</p>
+        <div class="people">
+          <div><span class="kicker">操作</span><b>刘云松</b></div>
+          <div><span class="kicker">验证 / 观测</span><b>刘云松、安宜龙</b></div>
+        </div>
+      </section>
+
+      <section class="section" id="rollout">
+        <div class="section-index">05</div>
+        <p class="kicker">Rollout</p>
+        <h2>COS 扩灰</h2>
+        <figure class="figure">
+          <img src="assets/file-storage-cos-rollout-0823-0906.png" alt="COS 存储扩灰计划" />
+        </figure>
+        <p class="figure-cap">8 月 23 日 — 9 月 6 日　<a href="assets/file-storage-cos-rollout-0823-0906.drawio">Draw.io</a></p>
+        <div class="day"><div class="day-date">代码<span>deny</span></div><div><p>代码发布验收完成前，不开 COS 写入。</p></div></div>
+        <div class="day"><div class="day-date">23<span>测试 + FS</span></div><div><p>先测试企业，通过后再加 FS。上传、读取、预览、转正式、分片、删除和关闭灰度都要过。</p></div></div>
+        <div class="day"><div class="day-date">26<span>100 小微</span></div><div><p>从 fast02、fast04 选 100 家在用小微。</p></div></div>
+        <div class="day"><div class="day-date">28<span>两分区</span></div><div><p>这两个分区全部非 VIP、非 SVIP。VIP / SVIP 不得进名单。</p></div></div>
+        <div class="day"><div class="day-date">31–04<span>40 / 60 / 全</span></div><div><p>累计扩大至全部非 VIP。百分比是企业名单累计范围，不是单企业随机比例，也不是在上一节点上再加一层。</p></div></div>
+        <div class="day"><div class="day-date">09.06<span>VIP / 全网</span></div><div><p>纳入剩余 VIP、SVIP，全网开启。数据专属始终不计入。</p></div></div>
+        <h3>单批操作</h3>
+        <ol class="steps">
+          <li>按当天节点生成名单，排除数据专属。</li>
+          <li>确认请求由新代码处理，核对分区、VIP 标签、名单和九套 warehouse。</li>
+          <li>按<a href="release.html#schedule">发布排期</a>把 <code>stone-cloud-write-v2</code> 整行替换后发布。</li>
+          <li>验新文件写入预期桶；验读取、预览、转正式、分片、删除；验存量 FastDFS 仍可读。</li>
+          <li>把单个测试企业移出后，新文件回 FastDFS，已有 COS 仍可访问。记录指标并达到观察时长。</li>
+        </ol>
+      </section>
+
+      <section class="section" id="verify">
+        <div class="section-index">06</div>
+        <p class="kicker">Verification</p>
+        <h2>验证方案</h2>
+        <table>
+          <thead><tr><th>场景</th><th>预期</th></tr></thead>
+          <tbody>
+            <tr><td>非灰度纷享销客上传</td><td>继续 FastDFS</td></tr>
+            <tr><td>COS 灰度企业上传</td><td>写入预期配置和桶</td></tr>
+            <tr><td>数据专属上传</td><td>走专属存储</td></tr>
+            <tr><td>同时命中专属和 COS</td><td>专属优先</td></tr>
+            <tr><td>退出灰度</td><td>新文件 FastDFS，已有 COS 继续可读</td></tr>
+            <tr><td>分片中改名单</td><td>已开始的上传在原目标完成</td></tr>
+            <tr><td>逻辑删除</td><td>业务不可见，COS 对象不立即永久删除</td></tr>
+            <tr><td>多记录引用</td><td>有其他引用时不处理物理对象</td></tr>
+          </tbody>
+        </table>
+        <p>每个场景同时确认：操作成功，内容/大小/校验正确；记录能定位实际存储；九套桶选择符合预期；没有误删共享对象；日志能定位存储和失败原因；指标满足发布单。</p>
+        <p>评审基线：<code>ceshi112</code> 人工测试通过；2026-07-20 自动化 645 用例、报告 99.16%。只说明已有范围，不替代生产端到端和恢复演练。</p>
+        <figure class="figure">
+          <img src="assets/automated-test-report-20260720.png" alt="2026 年 7 月 20 日自动化核心场景测试报告" />
+        </figure>
+        <p class="figure-cap">自动化核心场景 · 2026-07-20</p>
+        <p>全网完成：9 月 6 日全部纷享销客存储企业开启 COS 写入，业务与指标通过；FastDFS 回滚写入能力和容量保留到全网验收完成并确认无需回退。</p>
+      </section>
+
+      <section class="section" id="rollback">
+        <div class="section-index">07</div>
+        <p class="kicker">Stop / Rollback</p>
+        <h2>暂停与回退</h2>
+        <p>不建设 COS 到 FastDFS 的数据回迁。暂停只改后续新文件写入目标。</p>
+        <table>
+          <thead><tr><th>级别</th><th>场景</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>企业级</td><td>个别企业异常</td><td>移出名单，新文件回 FastDFS</td></tr>
+            <tr><td>一级</td><td>指标波动、功能可用</td><td>停止增加企业和比例</td></tr>
+            <tr><td>二级</td><td>写入、读取或性能系统性异常</td><td>关闭 COS 规则，保留读取</td></tr>
+          </tbody>
+        </table>
+        <p>已产生 COS 文件后：关闭灰度、保留读取/复制/删除/转正式、验证已有对象可访问、保持混合存储。不能回退到不支持 COS 读取的旧版本。每批真实企业前，测试企业必须做一次单企业暂停演练。</p>
+        <p>触发：核心操作持续失败；实际写入位置与名单或哈希不一致；Tomcat 或资源持续超阈值；桶权限、版本控制、生命周期或子用户隔离不符合预期。</p>
+      </section>
+
+      <section class="section" id="protect">
+        <div class="section-index">08</div>
+        <p class="kicker">Durability</p>
+        <h2>数据保护与恢复</h2>
+        <p>COS 多 AZ。长期保护继续用现有 MinIO 备份。本期不做跨地域自动切换；北京 COS 整体不可用时等待腾讯云恢复。数据专属走客户自己的灾备。</p>
+        <figure class="figure">
+          <img src="assets/file-storage-dr-lifecycle.svg" alt="数据灾备与删除保护流程" />
+        </figure>
+        <p class="figure-cap">删除保护　<a href="assets/file-storage-dr-lifecycle.drawio">Draw.io</a></p>
+        <ol class="steps">
+          <li>用户删除先逻辑删除，不立即永久删除 COS 对象。</li>
+          <li>程序 GC 在无其他引用且满足条件后移入应用回收区，默认 25 天后清理。</li>
+          <li>版本控制下，移动和删除产生删除标记并保留历史版本。</li>
+          <li>每个非当前版本独立计时：1 天转低频，60 天永久删除，并清理失效删除标记。</li>
+          <li>超过 COS 保留期后，按 MinIO 备份恢复。</li>
+        </ol>
+        <p class="note">25 天是程序 GC 默认清理时间，不是 COS 生命周期。60 天从成为非当前版本起算。恢复顺序：应用回收区 → COS 历史版本 → MinIO。业务删除不得指定版本 ID。未删除的当前版本不归档。临时桶必须配未完成分片清理，是否纳入 60 天恢复要单独确认。</p>
+        <p>官方参考：<a href="https://cloud.tencent.com/document/product/436/40548">多 AZ</a> · <a href="https://cloud.tencent.com/document/product/436/19883">版本控制</a> · <a href="https://cloud.tencent.com/document/product/436/14605">生命周期</a> · <a href="https://cloud.tencent.com/document/product/436/33417">存储类型</a></p>
+      </section>
+
+      <section class="section" id="risk">
+        <div class="section-index">09</div>
+        <p class="kicker">Risk &amp; Follow-up</p>
+        <h2>风险与待办</h2>
+        <table>
+          <thead><tr><th>风险</th><th>应对</th></tr></thead>
+          <tbody>
+            <tr><td>文件操作异常</td><td>小范围验证；异常暂停灰度</td></tr>
+            <tr><td>性能波动</td><td>每批留观察时间；超阈值停止扩大</td></tr>
+            <tr><td>混合读取错误</td><td>按文件记录选通道；每批验存量与新增</td></tr>
+            <tr><td>warehouse 路由错误</td><td>灰度前核对哈希、配置和实际写入位置</td></tr>
+            <tr><td>权限过大</td><td>九个子用户独立策略</td></tr>
+            <tr><td>生命周期配错</td><td>正式/临时桶逐一核对，完成恢复演练</td></tr>
+            <tr><td>版本无法完全回退</td><td>保留支持 COS 读取的版本，只停新增写入</td></tr>
+            <tr><td>北京 COS 整体不可用</td><td>无自动跨地域；MinIO 备份</td></tr>
+          </tbody>
+        </table>
+        <h3>后续事项</h3>
+        <table>
+          <thead><tr><th>事项</th><th>负责人</th><th>时间</th></tr></thead>
+          <tbody>
+            <tr><td>测试企业 COS 灰度与核心场景</td><td>刘云松、安宜龙</td><td>8 月 23 日</td></tr>
+            <tr><td>后续名单和节点门禁</td><td>刘云松、黎贵昂</td><td>每个节点开始前</td></tr>
+            <tr><td>FastDFS 回滚写入能力和容量</td><td>黎贵昂</td><td>全网验收完成前</td></tr>
+            <tr><td>生产 COS 子用户与权限</td><td>刘云松</td><td>测试企业灰度前</td></tr>
+            <tr><td>三类恢复演练</td><td>刘云松</td><td>真实企业扩灰前</td></tr>
+            <tr><td>ABU 客户灰度通知</td><td>刘云松</td><td>最终阶段前一周</td></tr>
+            <tr><td>上云成本跟踪</td><td>程波</td><td>扩灰期间按账单复核</td></tr>
+            <tr><td>停用企业与过期数据治理</td><td>刘云松</td><td>后续成本治理</td></tr>
+          </tbody>
+        </table>
+        <p>子用户创建参考 <a href="https://www.kdocs.cn/l/cpHrOQScCDbG">腾讯云 COS 子用户创建指南</a>。评审估算约为原成本三倍。</p>
+      </section>
+    </article>
+  </div>
+
+  <footer class="site-foot">
+    <span>Stone · File Cloud</span>
+    <span>存储改造方案 · 2026</span>
+  </footer>
+  <script src="assets/cloud-briefing.js"></script>
+</body>
+</html>
