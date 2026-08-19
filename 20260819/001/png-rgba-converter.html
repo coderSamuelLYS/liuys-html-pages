@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>白底图转透明 PNG</title>
+  <style>
+    :root {
+      --ink: #1c1610;
+      --paper: #f6efe2;
+      --paper-2: #efe4d0;
+      --line: #c9b89a;
+      --safelight: #d35400;
+      --safelight-deep: #9a3a00;
+      --ok: #2f6b3a;
+      --warn: #8a3b12;
+      --stage: #2b241c;
+      --stage-2: #3a3228;
+      --muted: #6d5d4a;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", "Source Han Serif SC", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #3d2c1a 0%, transparent 50%),
+        #16120e;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    header {
+      color: var(--paper);
+      margin-bottom: 22px;
+    }
+    .kicker {
+      font-family: "Avenir Next Condensed", "DIN Alternate", "PingFang SC", sans-serif;
+      letter-spacing: 0.22em;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #e0b07a;
+      margin: 0 0 8px;
+    }
+    h1 {
+      font-size: 34px;
+      line-height: 1.15;
+      margin: 0 0 10px;
+      font-weight: 600;
+    }
+    .lead {
+      margin: 0;
+      max-width: 46rem;
+      color: #d8c7ae;
+      font-size: 16px;
+    }
+
+    .board {
+      background: var(--paper);
+      border: 1px solid #d7c6a6;
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--paper-2);
+    }
+
+    .field { display: grid; gap: 6px; }
+    label {
+      font-family: "Avenir Next Condensed", "PingFang SC", sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    input[type="range"] { width: 160px; accent-color: var(--safelight); }
+    .val {
+      min-width: 2.5em;
+      font-variant-numeric: tabular-nums;
+      color: var(--safelight-deep);
+    }
+
+    .color-chip {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--ink);
+      background: #fff;
+      padding: 0;
+      cursor: pointer;
+    }
+    .mode {
+      display: flex;
+      gap: 8px;
+    }
+    .mode button, .btn {
+      font-family: "Avenir Next Condensed", "PingFang SC", sans-serif;
+      border: 1px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      padding: 8px 12px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+    }
+    .mode button.active, .btn.primary {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .btn.primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); }
+
+    .stages {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 420px;
+    }
+    .stage {
+      position: relative;
+      background:
+        linear-gradient(45deg, var(--stage) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--stage) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--stage) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--stage) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+      background-color: var(--stage-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .stage + .stage { border-left: 1px solid #1a140e; }
+    .stage img, .stage canvas {
+      max-width: 100%;
+      max-height: 460px;
+      object-fit: contain;
+    }
+    .tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(246, 239, 226, 0.92);
+      padding: 4px 8px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+    }
+    .drop {
+      width: 100%;
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #efe4d0;
+      text-align: center;
+      padding: 24px;
+      cursor: pointer;
+    }
+    .drop strong { font-size: 22px; color: #fff7ea; }
+    .drop span { color: #cbb89a; margin-top: 8px; }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      padding: 16px 20px 20px;
+      align-items: start;
+    }
+    .notes {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .badge {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      font-size: 13px;
+    }
+    .badge.ok { border-color: var(--ok); color: var(--ok); }
+    .badge.warn { border-color: var(--warn); color: var(--warn); }
+
+    .hint {
+      margin-top: 14px;
+      color: #cbb89a;
+      font-size: 13px;
+    }
+
+    @media (max-width: 800px) {
+      .stages, .toolbar, .meta { grid-template-columns: 1fr; }
+      .stage + .stage { border-left: 0; border-top: 1px solid #1a140e; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="kicker">Temporary studio tool</p>
+      <h1>白底图转透明 PNG</h1>
+      <p class="lead">
+        把 JPEG、假 PNG（只是后缀叫 png）转成带透明通道的真 PNG。
+        处理只在你的浏览器里完成，文件不会上传到服务器。转完后下载，再走原来的上传即可。
+      </p>
+    </header>
+
+    <div class="board">
+      <div class="toolbar">
+        <div class="row">
+          <div class="field">
+            <label>处理方式</label>
+            <div class="mode">
+              <button type="button" id="modeKnock" class="active">抠掉底色</button>
+              <button type="button" id="modeKeep">只转真 PNG</button>
+            </div>
+          </div>
+          <div class="field" id="colorField">
+            <label>要抠的颜色（可点原图取样）</label>
+            <input id="color" class="color-chip" type="color" value="#ffffff" />
+          </div>
+          <div class="field" id="fuzzField">
+            <label>容差 <span class="val" id="fuzzVal">18</span></label>
+            <input id="fuzz" type="range" min="0" max="80" value="18" />
+          </div>
+          <div class="field" id="featherField">
+            <label>边缘柔化 <span class="val" id="featherVal">8</span></label>
+            <input id="feather" type="range" min="0" max="30" value="8" />
+          </div>
+        </div>
+        <button class="btn primary" id="download" disabled>下载透明 PNG</button>
+      </div>
+
+      <div class="stages">
+        <div class="stage" id="srcStage">
+          <div class="tag">原图 · 点击取样</div>
+          <label class="drop" id="drop">
+            <strong>把图片拖到这里</strong>
+            <span>或点击选择 JPG / PNG / WebP</span>
+            <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/*" hidden />
+          </label>
+        </div>
+        <div class="stage" id="outStage">
+          <div class="tag">结果 · 棋盘格是透明</div>
+          <canvas id="out" hidden></canvas>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div>
+          <div id="badges"></div>
+          <p class="notes" id="notes">
+            「抠掉底色」会把近白色变成透明，适合 logo / 海报。
+            边缘发毛就把容差调小，抠不干净就调大。
+            「只转真 PNG」不改画面，只保证带透明通道。
+          </p>
+        </div>
+        <p class="notes">建议用桌面 Chrome / Edge。大图会稍慢。</p>
+      </div>
+    </div>
+    <p class="hint">临时工具。正式方案仍应让上传接口带上 keepFormat=true。</p>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      mode: "knock",
+      fileName: "image",
+      sourceKind: "",
+      img: null,
+      outBlob: null
+    };
+
+    const srcImg = document.createElement("img");
+    srcImg.alt = "原图";
+    srcImg.style.maxWidth = "100%";
+    srcImg.style.maxHeight = "460px";
+
+    function sniff(buf) {
+      const u = new Uint8Array(buf.slice(0, 16));
+      const hex = [...u].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (hex.startsWith("89504e47")) return "PNG";
+      if (hex.startsWith("ffd8ff")) return "JPEG";
+      if (hex.startsWith("52494646") && hex.includes("57454250")) return "WebP";
+      return "未知";
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      $("modeKnock").classList.toggle("active", mode === "knock");
+      $("modeKeep").classList.toggle("active", mode === "keep");
+      const show = mode === "knock";
+      $("colorField").style.display = show ? "" : "none";
+      $("fuzzField").style.display = show ? "" : "none";
+      $("featherField").style.display = show ? "" : "none";
+      render();
+    }
+
+    function hexToRgb(hex) {
+      const n = hex.replace("#", "");
+      return {
+        r: parseInt(n.slice(0, 2), 16),
+        g: parseInt(n.slice(2, 4), 16),
+        b: parseInt(n.slice(4, 6), 16)
+      };
+    }
+
+    function render() {
+      if (!state.img) return;
+      const canvas = $("out");
+      const w = state.img.naturalWidth;
+      const h = state.img.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
+      canvas.hidden = false;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(state.img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+
+      if (state.mode === "knock") {
+        const { r: tr, g: tg, b: tb } = hexToRgb($("color").value);
+        const fuzz = Number($("fuzz").value);
+        const feather = Number($("feather").value);
+        const maxDist = Math.sqrt(3 * 255 * 255);
+        const fuzzDist = (fuzz / 100) * maxDist;
+        const featherDist = (feather / 100) * maxDist;
+        const hard = Math.max(0, fuzzDist - featherDist);
+        for (let i = 0; i < d.length; i += 4) {
+          const dist = Math.hypot(d[i] - tr, d[i + 1] - tg, d[i + 2] - tb);
+          if (dist <= hard) {
+            d[i + 3] = 0;
+          } else if (dist < fuzzDist && featherDist > 0) {
+            d[i + 3] = Math.round(d[i + 3] * ((dist - hard) / (fuzzDist - hard)));
+          }
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
+
+      canvas.toBlob((blob) => {
+        state.outBlob = blob;
+        $("download").disabled = !blob;
+        blob.arrayBuffer().then((buf) => {
+          const view = new DataView(buf);
+          const colorType = view.getUint8(25);
+          const badges = $("badges");
+          const fakePng = state.fileName.toLowerCase().endsWith(".png") && state.sourceKind !== "PNG";
+          badges.innerHTML =
+            `<span class="badge${state.sourceKind === "PNG" ? "" : " warn"}">源文件 ${state.sourceKind}</span>` +
+            (fakePng ? `<span class="badge warn">后缀是 png，内容不是 PNG</span>` : "") +
+            `<span class="badge">${w} × ${h}</span>` +
+            `<span class="badge ok">输出 PNG colorType=${colorType}（${colorType > 4 ? "有透明通道" : "无透明"}）</span>`;
+        });
+      }, "image/png");
+    }
+
+    function loadFile(file) {
+      state.fileName = file.name.replace(/\.[^.]+$/, "") || "image";
+      file.arrayBuffer().then((buf) => {
+        state.sourceKind = sniff(buf);
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          state.img = img;
+          const drop = $("drop");
+          drop.replaceWith(srcImg);
+          srcImg.src = url;
+          $("srcStage").appendChild(srcImg);
+          render();
+        };
+        img.src = url;
+      });
+    }
+
+    $("modeKnock").onclick = () => setMode("knock");
+    $("modeKeep").onclick = () => setMode("keep");
+    $("fuzz").oninput = () => { $("fuzzVal").textContent = $("fuzz").value; render(); };
+    $("feather").oninput = () => { $("featherVal").textContent = $("feather").value; render(); };
+    $("color").oninput = render;
+
+    $("drop").addEventListener("click", () => $("file").click());
+    $("file").onchange = (e) => {
+      if (e.target.files[0]) loadFile(e.target.files[0]);
+    };
+
+    ;["dragenter", "dragover"].forEach((ev) => {
+      $("srcStage").addEventListener(ev, (e) => { e.preventDefault(); });
+    });
+    $("srcStage").addEventListener("drop", (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file) loadFile(file);
+    });
+
+    srcImg.addEventListener("click", (e) => {
+      if (!state.img) return;
+      const rect = srcImg.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) * (state.img.naturalWidth / rect.width));
+      const y = Math.floor((e.clientY - rect.top) * (state.img.naturalHeight / rect.height));
+      const c = document.createElement("canvas");
+      c.width = state.img.naturalWidth;
+      c.height = state.img.naturalHeight;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(state.img, 0, 0);
+      const p = ctx.getImageData(x, y, 1, 1).data;
+      const hex = "#" + [p[0], p[1], p[2]].map((n) => n.toString(16).padStart(2, "0")).join("");
+      $("color").value = hex;
+      if (state.mode === "keep") setMode("knock");
+      else render();
+    });
+
+    $("download").onclick = () => {
+      if (!state.outBlob) return;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(state.outBlob);
+      a.download = state.fileName + "-rgba.png";
+      a.click();
+    };
+  </script>
+</body>
+</html>
